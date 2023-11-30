@@ -14,6 +14,8 @@ def parse_arguments():
     parser.add_argument("-lr", "--learning_rate", default = 1e-3, type = float, help = "Learning Rate")
     parser.add_argument("-s","--seed", default = 42, type = int, help="Seed for reproducibility")
     parser.add_argument("-r", "--resume_training",  action="store_true",  help = "Resume training from checkpoint")
+    parser.add_argument("-l", "--lookback", default = 10, type = int, help = "Number of epochs to wait before early stopping")
+    parser.add_argument("-se", "--starting_epoch", default = 0, type = int, help = "Epoch number for restarting training")
     args = parser.parse_args()
 
     print(args)

@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import os
 import numpy as np
 import random 
@@ -27,26 +21,20 @@ from dataloader import CroppedSegmentationDataset
 import models
 
 
-# In[2]:
-
-
-# args = utils.parse_arguments()
 #Parameters
+args = utils.parse_arguments()
 data_dir= r"/scratch/kj1447/gracelab/dataset"
-model_dir = os.path.join("/scratch/kj1447/gracelab/models","cropped_rgb_resnet18_augmentation_dice")
-loss_type = "DICE"
-N_EPOCHS = 250
-BATCH_SIZE = 8
-num_workers = 8
-train_ratio = 0.8
-learning_rate = 1e-3
-lookback = 10
-seed = 42
-starting_epoch = 0
-resume = False
-
-
-# In[3]:
+model_dir = os.path.join("/scratch/kj1447/gracelab/models",args.model_dir)
+loss_type = args.loss
+N_EPOCHS = args.epochs
+BATCH_SIZE = args.batch_size
+num_workers = args.workers
+train_ratio = args.train_ratio
+learning_rate = args.learning_rate
+lookback = args.lookback
+seed = args.seed
+starting_epoch = args.starting_epoch
+resume = args.resume_training
 
 
 if not os.path.isdir(model_dir):
@@ -54,20 +42,7 @@ if not os.path.isdir(model_dir):
 utils.set_seed(seed)
 
 
-# In[4]:
-
-
-image_dir = os.path.join(data_dir, 'image_stack_cropped')
-mask_dir = os.path.join(data_dir, 'mask_cropped')
-image_filenames = os.listdir(image_dir)
-random.shuffle(image_filenames)
-train_set = image_filenames[:int(train_ratio*len(image_filenames))]
-val_set = image_filenames[int(train_ratio*len(image_filenames)):]
-
-
-# In[5]:
-
-
+#DATALOADER
 geo_transform = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
@@ -80,27 +55,31 @@ color_transform = transforms.Compose([
     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
 ])
 
+
+image_dir = os.path.join(data_dir, 'image_stack_cropped')
+mask_dir = os.path.join(data_dir, 'mask_cropped')
+image_filenames = os.listdir(image_dir)
+random.shuffle(image_filenames)
+train_set = image_filenames[:int(train_ratio*len(image_filenames))]
+val_set = image_filenames[int(train_ratio*len(image_filenames)):]
 train_dataset = CroppedSegmentationDataset(data_dir = data_dir, image_files=train_set, geo_transforms=geo_transform, color_transforms= color_transform)
 val_dataset = CroppedSegmentationDataset(data_dir = data_dir, image_files=val_set, geo_transforms=None, color_transforms= None)
-
 train_dataloader = data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory = True, num_workers = num_workers)
 val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False,  pin_memory = True,  num_workers = num_workers)
 
 
-# In[7]:
 
-
+#MODELS
 weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
 kind = 'vanila_unet'
 pretrained=True
 checkpoint_path = "/scratch/kj1447/gracelab/models/cropped_rgb_resnet18_augmentation/36.pth"  # Replace with your file path
 model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path)
 
-for name, param in model.named_parameters():
+#FREEZE MODEL
+# for name, param in model.named_parameters():
 #     if name.split('.')[0]=='encoder':
 #         param.requires_grad=False
-    print(name, param.requires_grad)
-# In[77]:
 
 
 if loss_type == 'BCE':
@@ -112,31 +91,12 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 8, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08, verbose=True)
 
 
-# In[78]:
-
-
 if torch.cuda.is_available():
     print("Using GPU")
     device = torch.device("cuda:0")
     model = model.to(device)
 else:
     device = torch.device("cpu")
-
-
-# In[79]:
-
-
-import time
-start = time.time()
-for batch in train_dataloader:
-#     print(batch[0].shape, batch[1].shape)
-    break
-end = time.time()
-print(end-start)
-print(len(train_dataloader))
-
-
-# In[80]:
 
 
 training_losses = []
@@ -227,10 +187,6 @@ print("Val Losses")
 print(validation_losses)
 print("Val IOUs")
 print(validation_ious)
-
-
-# In[ ]:
-
 
 
 
