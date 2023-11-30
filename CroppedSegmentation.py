@@ -74,7 +74,7 @@ weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
 kind = 'vanila_unet'
 pretrained=True
 checkpoint_path = "/scratch/kj1447/gracelab/models/cropped_rgb_resnet18_augmentation/36.pth"  # Replace with your file path
-model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path)
+model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path+None)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():
@@ -88,7 +88,7 @@ elif loss_type == 'DICE':
     criterion = smp.losses.DiceLoss(mode ='binary')
     
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 8, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 10, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08, verbose=True)
 
 
 if torch.cuda.is_available():
