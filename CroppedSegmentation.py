@@ -35,7 +35,7 @@ lookback = args.lookback
 seed = args.seed
 starting_epoch = args.starting_epoch
 resume = args.resume_training
-
+kind = args.model_type
 
 if not os.path.isdir(model_dir):
     os.mkdir(model_dir)
@@ -71,10 +71,9 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=Fal
 
 #MODELS
 weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
-kind = 'vanila_unet'
 pretrained=True
 checkpoint_path = "/scratch/kj1447/gracelab/models/cropped_rgb_resnet18_augmentation/36.pth"  # Replace with your file path
-model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path+None)
+model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path=None)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():

@@ -16,6 +16,9 @@ def parse_arguments():
     parser.add_argument("-r", "--resume_training",  action="store_true",  help = "Resume training from checkpoint")
     parser.add_argument("-l", "--lookback", default = 10, type = int, help = "Number of epochs to wait before early stopping")
     parser.add_argument("-se", "--starting_epoch", default = 0, type = int, help = "Epoch number for restarting training")
+    parser.add_argument("-ui", "--upsampled_image_size", default = 256, type = int, help = "Size of Upsampled Image")
+    parser.add_argument("-um", "--upsampled_mask_size", default = 256, type = int, help = "Size of Upsampled Mask")
+    parser.add_argument("-mt","--model_type", default='vanilla_unet', help='type of model')
     args = parser.parse_args()
 
     print(args)

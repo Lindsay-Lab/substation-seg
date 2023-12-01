@@ -4,7 +4,7 @@ from torch import nn
 
 def setup_model(kind, pretrained, pretrained_weights, resume, checkpoint_path=None):
     
-    if kind == 'vanila_unet':        
+    if kind == 'vanilla_unet':        
         model = smp.Unet(
             encoder_name="resnet18",       
             encoder_weights=None,     
@@ -37,7 +37,7 @@ def setup_model(kind, pretrained, pretrained_weights, resume, checkpoint_path=No
             state_dict = pretrained_weights.get_state_dict(progress=True)
             if kind == 'modified_unet':
                 model.unet.encoder.load_state_dict(state_dict)
-            else: 
+            elif kind == 'vanilla_unet': 
                 model.encoder.load_state_dict(state_dict)
      
     if resume:
