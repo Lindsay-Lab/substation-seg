@@ -19,6 +19,7 @@ def parse_arguments():
     parser.add_argument("-ui", "--upsampled_image_size", default = 256, type = int, help = "Size of Upsampled Image")
     parser.add_argument("-um", "--upsampled_mask_size", default = 256, type = int, help = "Size of Upsampled Mask")
     parser.add_argument("-mt","--model_type", default='vanilla_unet', help='type of model')
+    parser.add_argument("-ic","--in_channels", default=13, help='num channels to use')
     args = parser.parse_args()
 
     print(args)
