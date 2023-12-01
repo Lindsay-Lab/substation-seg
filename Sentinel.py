@@ -22,8 +22,8 @@ import models
 
 #Parameters
 args = utils.parse_arguments()
-data_dir= r"/scratch/kj1447/gracelab/dataset"
-model_dir = os.path.join("/scratch/kj1447/gracelab/models",args.model_dir)
+data_dir= r"/scratch/paa9751/substation-seg/dataset"
+model_dir = os.path.join("/scratch/paa9751/substation-seg/models/",args.model_dir)
 loss_type = args.loss
 N_EPOCHS = args.epochs
 BATCH_SIZE = args.batch_size
@@ -111,7 +111,7 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
         optimizer.zero_grad()
         data, target = batch[0].to(device).float(), batch[1].to(device)
         output = model(data)
-        if (upsampled_mask_size<upsampled_image_size) & kind=='vanilla_unet':
+        if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
             output = downsample(output) 
         if loss_type == 'FOCAL':
             loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
@@ -133,7 +133,7 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
         for batch in val_dataloader:
             data, target = batch[0].to(device).float(), batch[1].to(device)
             output = model(data)
-            if upsampled_mask_size<upsampled_image_size:
+            if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
                 output = downsample(output) 
             if loss_type == 'FOCAL':
                 loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
