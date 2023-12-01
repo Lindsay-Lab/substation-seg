@@ -5,7 +5,7 @@ import os
 
 
 class CroppedSegmentationDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None):
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -13,6 +13,7 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         self.mask_dir = os.path.join(data_dir, 'mask_cropped')
         self.image_filenames = image_files
         self.in_channels=in_channels
+        self.use_timepoints = use_timepoints
         
     def __getitem__(self, index):
         # load images and masks
@@ -21,13 +22,18 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         mask_filename = image_filename
         mask_path = os.path.join(self.mask_dir, mask_filename)
         
-        image = np.median(np.load(image_path), axis=0)
+        if self.use_timepoints: 
+            image = np.load(image_path) # t x 13 x h x w 
+            image = np.reshape(image, (-1, image.shape[2], image.shape[3]))
+        else: 
+            image = np.median(np.load(image_path), axis=0)
+            
         if self.in_channels==3:
             image = image[[3,2,1],:,:]
         
         image = np.clip(image/5000,0,1)
         
-        mask = np.load(mask_path)      
+        mask = np.load(mask_path)
         image = torch.from_numpy(image) #3x228x228
         mask = torch.from_numpy(mask).float().unsqueeze(0) #1x228x228
         
@@ -56,7 +62,7 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         
 
 class FullImageDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, image_files, in_channels=3, img_transforms=None, mask_transforms=None):
+    def __init__(self, data_dir, image_files, in_channels=3, img_transforms=None, mask_transforms=None, use_timepoints=False):
         self.data_dir = data_dir
         self.img_transforms = img_transforms
         self.mask_transforms = mask_transforms
@@ -64,6 +70,7 @@ class FullImageDataset(torch.utils.data.Dataset):
         self.mask_dir = os.path.join(data_dir, 'mask')
         self.image_filenames = image_files
         self.in_channels=in_channels
+        self.use_timepoints = use_timepoints 
         
     def __getitem__(self, index):
         image_filename = self.image_filenames[index]
@@ -71,7 +78,12 @@ class FullImageDataset(torch.utils.data.Dataset):
         mask_filename = image_filename
         mask_path = os.path.join(self.mask_dir, mask_filename)
 
-        image = np.median(np.load(image_path)['arr_0'], axis = 0) 
+        if self.use_timepoints: 
+            image = np.load(image_path)['arr_0'] # t x 13 x h x w 
+            image = np.reshape(image, (-1, image.shape[2], image.shape[3]))
+        else: 
+            image = np.median(np.load(image_path)['arr_0'], axis=0)
+            
         if self.in_channels==3:
             image = image[[3,2,1],:,:]
 
