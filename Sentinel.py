@@ -37,6 +37,7 @@ starting_epoch = args.starting_epoch
 kind = args.model_type
 upsampled_image_size=args.upsampled_image_size
 upsampled_mask_size=args.upsampled_mask_size
+in_channels = args.in_channels
 
 if not os.path.isdir(model_dir):
     os.mkdir(model_dir)
@@ -61,8 +62,9 @@ random.shuffle(image_filenames)
 train_set = image_filenames[:int(train_ratio*len(image_filenames))]
 val_set = image_filenames[int(train_ratio*len(image_filenames)):]
 
-train_dataset = FullImageDataset(data_dir = data_dir, image_files=train_set, img_transforms=image_transform, mask_transforms=mask_transform)
-val_dataset = FullImageDataset(data_dir = data_dir, image_files=val_set, img_transforms=image_transform, mask_transforms=mask_transform)
+train_dataset = FullImageDataset(data_dir = data_dir, image_files=train_set, in_channels = in_channels, img_transforms=image_transform, mask_transforms=mask_transform)
+val_dataset = FullImageDataset(data_dir = data_dir, image_files=val_set, in_channels = in_channels, img_transforms=image_transform, mask_transforms=mask_transform)
+
 train_dataloader = data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory = True, num_workers = num_workers)
 val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False,  pin_memory = True,  num_workers = num_workers)
 
@@ -109,7 +111,7 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
         optimizer.zero_grad()
         data, target = batch[0].to(device).float(), batch[1].to(device)
         output = model(data)
-        if upsampled_mask_size<upsampled_image_size:
+        if (upsampled_mask_size<upsampled_image_size) & kind=='vanilla_unet':
             output = downsample(output) 
         if loss_type == 'FOCAL':
             loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
