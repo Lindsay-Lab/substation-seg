@@ -1,5 +1,6 @@
 import segmentation_models_pytorch as smp
 from torchvision.models._api import WeightsEnum
+from torch import nn
 
 def setup_model(kind, pretrained, pretrained_weights, resume, checkpoint_path=None):
     
@@ -34,7 +35,10 @@ def setup_model(kind, pretrained, pretrained_weights, resume, checkpoint_path=No
         assert pretrained_weights is not None
         if isinstance(pretrained_weights, WeightsEnum):
             state_dict = pretrained_weights.get_state_dict(progress=True)
-            model.encoder.load_state_dict(state_dict)
+            if kind == 'modified_unet':
+                model.unet.encoder.load_state_dict(state_dict)
+            else: 
+                model.encoder.load_state_dict(state_dict)
      
     if resume:
         assert checkpoint_path is not None
