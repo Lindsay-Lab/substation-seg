@@ -21,6 +21,8 @@ from torchgeo.models import ResNet50_Weights
 from torchvision.models._api import WeightsEnum
 import torch.nn.functional as F
 
+from models import setup_model
+
 #setting seed for reproducibility
 torch.manual_seed(42)
         
@@ -28,6 +30,9 @@ parser = argparse.ArgumentParser(description = "Define parameters like loss func
 
 parser.add_argument("-m","--model_dir", help="Model Directory for Saving Checkpoints. A folder with this name would be created within the models folder")
 parser.add_argument("-l","--loss", default = "BCE", help="Can take following values - BCE, FOCAL or DICE")
+
+parser.add_argument("-model_type", default='vanilla_unet', help='type of model')
+
 parser.add_argument("-e","--epochs", default = 250, type = int, help="Number of epochs")
 parser.add_argument("-bs","--batch_size", default = 32, type=int, help="Batch Size")
 parser.add_argument("-w","--workers", default = 16, type=int, help="Number of Workers")
@@ -46,6 +51,7 @@ BATCH_SIZE = args.batch_size
 num_workers = args.workers
 train_ratio = args.train_ratio
 learning_rate = args.learning_rate
+kind = args.model_type
 
 if not os.path.isdir(model_dir):
     os.mkdir(model_dir)
@@ -136,13 +142,7 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=Fal
 
 
 weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
-model = smp.Unet(
-    encoder_name="resnet50",       
-    encoder_weights=None,     
-    in_channels=13,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-    classes=1,                      # model output channels (number of classes in your dataset)
-#     activation = 'sigmoid'     # because using sigmoid_focal_loss
-)
+model = setup_model(kind, pretrained=True, pretrained_weights, resume=False, checkpoint_path=None)
 
 ###########################
 #code to itialize weights
@@ -166,9 +166,9 @@ model = smp.Unet(
 # # load params
 # model.load_state_dict(checkpoint)
 
-if isinstance(weights, WeightsEnum):
-    state_dict = weights.get_state_dict(progress=True)
-model.encoder.load_state_dict(state_dict)
+#if isinstance(weights, WeightsEnum):
+ #   state_dict = weights.get_state_dict(progress=True)
+#model.encoder.load_state_dict(state_dict)
 
 if loss_type == 'BCE':
     criterion = nn.BCEWithLogitsLoss()

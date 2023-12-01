@@ -33,6 +33,9 @@ parser.add_argument("-bs","--batch_size", default = 32, type=int, help="Batch Si
 parser.add_argument("-w","--workers", default = 16, type=int, help="Number of Workers")
 parser.add_argument("-tr", "--train_ratio", default = 0.8, type = float, help = "Train-Validation Ratio")
 parser.add_argument("-lr", "--learning_rate", default = 1e-3, type = float, help = "Learning Rate")
+
+parser.add_argument("-model_type", default='vanilla_unet', help='type of model')
+
 args = parser.parse_args()
 
 print(args)
@@ -134,13 +137,8 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=Fal
 
 
 weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
-model = smp.Unet(
-    encoder_name="resnet50",       
-    encoder_weights=None,     
-    in_channels=13,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-    classes=1,                      # model output channels (number of classes in your dataset)
-#     activation = 'sigmoid'     # because using sigmoid_focal_loss
-)
+
+model = setup_model(kind, pretrained=True, pretrained_weights=weights, resume=False, checkpoint_path=None)
 
 ###########################
 #code to itialize weights
@@ -164,9 +162,9 @@ model = smp.Unet(
 # # load params
 # model.load_state_dict(checkpoint)
 
-if isinstance(weights, WeightsEnum):
-    state_dict = weights.get_state_dict(progress=True)
-model.encoder.load_state_dict(state_dict)
+#if isinstance(weights, WeightsEnum):
+    #state_dict = weights.get_state_dict(progress=True)
+#model.encoder.load_state_dict(state_dict)
 
 if loss_type == 'BCE':
     criterion = nn.BCEWithLogitsLoss()
