@@ -5,13 +5,14 @@ import os
 
 
 class CroppedSegmentationDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, image_files, geo_transforms=None, color_transforms= None):
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
         self.image_dir = os.path.join(data_dir, 'image_stack_cropped')
         self.mask_dir = os.path.join(data_dir, 'mask_cropped')
         self.image_filenames = image_files
+        self.in_channels=in_channels
         
     def __getitem__(self, index):
         # load images and masks
@@ -21,7 +22,9 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         mask_path = os.path.join(self.mask_dir, mask_filename)
         
         image = np.median(np.load(image_path), axis=0)
-        image = image[[3,2,1],:,:]
+        if self.in_channels==3:
+            image = image[[3,2,1],:,:]
+        
         image = np.clip(image/5000,0,1)
         
         mask = np.load(mask_path)      
@@ -31,7 +34,7 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         if self.geo_transforms:
             combined = torch.cat((image,mask), 0)
             combined = self.geo_transforms(combined)
-            image,mask = torch.split(combined, [3,1], 0)
+            image,mask = torch.split(combined, [self.in_channels,1], 0)
         
         if self.color_transforms:
             image = self.color_transforms(image)
@@ -52,14 +55,15 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         axs[1].imshow(mask.permute(1,2,0), alpha=0.5, cmap='gray')
         
 
-class FullImageDataset(data.Dataset):
-    def __init__(self, data_dir, image_files, img_transforms=None, mask_transforms=None):
+class FullImageDataset(torch.utils.data.Dataset):
+    def __init__(self, data_dir, image_files, in_channels=3, img_transforms=None, mask_transforms=None):
         self.data_dir = data_dir
         self.img_transforms = img_transforms
         self.mask_transforms = mask_transforms
         self.image_dir = os.path.join(data_dir, 'image_stack')
         self.mask_dir = os.path.join(data_dir, 'mask')
         self.image_filenames = image_files
+        self.in_channels=in_channels
         
     def __getitem__(self, index):
         image_filename = self.image_filenames[index]
@@ -68,7 +72,8 @@ class FullImageDataset(data.Dataset):
         mask_path = os.path.join(self.mask_dir, mask_filename)
 
         image = np.median(np.load(image_path)['arr_0'], axis = 0) 
-#         image = image[[3,2,1],:,:]
+        if self.in_channels==3:
+            image = image[[3,2,1],:,:]
 
         #standardizing image
         image = image/5000
