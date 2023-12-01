@@ -18,7 +18,7 @@ from torchgeo.models import ResNet50_Weights,ResNet50_Weights
 import utils
 from dataloader import FullImageDataset
 import models
-
+from models import setup_model
 
 #Parameters
 args = utils.parse_arguments()
@@ -73,7 +73,7 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=Fal
 pretrained=True
 weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
 checkpoint_path = None
-model = setup_model(kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path=checkpoint_path)
+model = setup_model(kind, in_channels=in_channels , pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path=checkpoint_path)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():
