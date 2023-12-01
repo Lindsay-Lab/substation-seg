@@ -1,6 +1,7 @@
 import segmentation_models_pytorch as smp
 from torchvision.models._api import WeightsEnum
 from torch import nn
+import torch 
 
 def setup_model(kind, in_channels, pretrained, pretrained_weights, resume, checkpoint_path=None):
     
