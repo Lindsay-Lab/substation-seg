@@ -116,8 +116,8 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
 class FullImageDataset(torch.utils.data.Dataset):
     def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False):
         self.data_dir = data_dir
-        self.img_transforms = img_transforms
-        self.mask_transforms = mask_transforms
+        self.geo_transforms = geo_transforms
+        self.color_transforms = color_transforms
         self.image_dir = os.path.join(data_dir, 'image_stack')
         self.mask_dir = os.path.join(data_dir, 'mask')
         self.image_filenames = image_files
