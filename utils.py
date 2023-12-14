@@ -20,7 +20,9 @@ def parse_arguments():
     parser.add_argument("-um", "--upsampled_mask_size", default = 256, type = int, help = "Size of Upsampled Mask")
     parser.add_argument("-mt","--model_type", default='vanilla_unet', help='type of model')
     parser.add_argument("-ic","--in_channels", default=13, help='num channels to use')
-    parser.add_argument("-ut","--use_timepoints", default=False, help='use time channel (true/false)')
+    parser.add_argument("-ut","--use_timepoints", action="store_true", help='use time channel (true/false)')
+    parser.add_argument("-p", "--pretrained",  action="store_true",  help = "Use Pretrained Model")
+    parser.add_argument("-cp", "--checkpoint", help = "Path for checkpoint")
     args = parser.parse_args()
 
     print(args)
