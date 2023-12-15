@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 import random 
 import matplotlib.pyplot as plt
@@ -8,6 +9,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import torch
 import torch.utils.data as data
+# from torch.utils.tensorboard import SummaryWriter
+
 import torchvision.transforms as transforms
 from torchvision.ops import sigmoid_focal_loss
 import segmentation_models_pytorch as smp
@@ -17,8 +20,9 @@ from torchgeo.models import ResNet18_Weights,ResNet50_Weights
 
 #our files
 import utils
-from dataloader import CroppedSegmentationDataset
+from dataloader import CroppedSegmentationDataset, CroppedSegmentationPerTimeDataset
 import models
+# writer=SummaryWriter(log_dir='logs/exp3', max_queue=2)
 
 
 #Parameters
@@ -35,8 +39,25 @@ lookback = args.lookback
 seed = args.seed
 starting_epoch = args.starting_epoch
 resume = args.resume_training
-kind = args.model_type
+in_channels = args.in_channels
+use_timepoints = args.use_timepoints
 
+kind = args.model_type
+pretrained=args.pretrained
+if pretrained:
+    if in_channels == 3:
+        weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
+    else:
+        weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+else:
+    weights = None
+    
+if resume:
+    checkpoint_path = args.checkpoint  # Replace with your file path
+else:
+    checkpoint_path = None
+
+    
 if not os.path.isdir(model_dir):
     os.mkdir(model_dir)
 utils.set_seed(seed)
@@ -56,24 +77,33 @@ color_transform = transforms.Compose([
 ])
 
 
-image_dir = os.path.join(data_dir, 'image_stack_cropped')
+image_dir = os.path.join(data_dir, 'image_stack_cropped_per_time') #Select which directory you want to read images from
 mask_dir = os.path.join(data_dir, 'mask_cropped')
 image_filenames = os.listdir(image_dir)
-random.shuffle(image_filenames)
+# random.shuffle(image_filenames) #comment in case you read from folder where each timepoint has been saved as an individual image. This is to prevent leakage between train and val set
 train_set = image_filenames[:int(train_ratio*len(image_filenames))]
 val_set = image_filenames[int(train_ratio*len(image_filenames)):]
-train_dataset = CroppedSegmentationDataset(data_dir = data_dir, image_files=train_set, geo_transforms=geo_transform, color_transforms= color_transform)
-val_dataset = CroppedSegmentationDataset(data_dir = data_dir, image_files=val_set, geo_transforms=None, color_transforms= None)
+
+
+#logic to exclude images with less than 5 timepoints
+# with open("dataset/exclude_list","rb") as f:
+#     exclude_list = pickle.load(f)
+# image_filenames_sub = [x for x in image_filenames if x not in exclude_list]
+
+# print(len(image_filenames), len(exclude_list), len(image_filenames_sub))
+# random.shuffle(image_filenames_sub)
+# train_set = image_filenames_sub[:int(train_ratio*len(image_filenames_sub))]
+# val_set = image_filenames_sub[int(train_ratio*len(image_filenames_sub)):]
+
+train_dataset = CroppedSegmentationPerTimeDataset(data_dir = data_dir, image_files=train_set, geo_transforms=geo_transform, color_transforms= None)
+val_dataset = CroppedSegmentationPerTimeDataset(data_dir = data_dir, image_files=val_set, geo_transforms=None, color_transforms= None)
 train_dataloader = data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory = True, num_workers = num_workers)
 val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False,  pin_memory = True,  num_workers = num_workers)
 
 
 
 #MODELS
-weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
-pretrained=True
-checkpoint_path = "/scratch/kj1447/gracelab/models/cropped_rgb_resnet18_augmentation/36.pth"  # Replace with your file path
-model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, resume=resume, checkpoint_path=None)
+model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, in_channels=in_channels, resume=resume, checkpoint_path= checkpoint_path)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():
@@ -106,6 +136,7 @@ counter = 0
 
 for e in range(starting_epoch,starting_epoch+N_EPOCHS):    
     #Training
+    print("Starting Epoch : ",str(e))
     train_loss=0
     model.train();
     for i , batch in enumerate(train_dataloader):
@@ -113,13 +144,13 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
         data, target = batch[0].to(device).float(), batch[1].to(device)
         output = model(data)        
         if loss_type == 'FOCAL':
-            loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
+            loss = sigmoid_focal_loss(output, target, alpha = 0.75, reduction = 'mean')
         else:
             loss = criterion(output, target)
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        if i%400==0:
+        if i%500==0:
             print("Batch ",i," - Train Loss = ",train_loss/(i+1))
     train_loss = train_loss/len(train_dataloader)
     training_losses.append(train_loss)
@@ -133,7 +164,7 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
             data, target = batch[0].to(device).float(), batch[1].to(device)
             output = model(data)
             if loss_type == 'FOCAL':
-                loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
+                loss = sigmoid_focal_loss(output, target, alpha = 0.75, reduction = 'mean')
             else:
                 loss = criterion(output, target)
             output = torch.sigmoid(output)
@@ -177,6 +208,14 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
     if counter>=lookback:
         print("Early Stopping Reached")
         break
+    
+    if (e+1)%15==0:
+        print("Training Losses")
+        print(training_losses)
+        print("Val Losses")
+        print(validation_losses)
+        print("Val IOUs")
+        print(validation_ious)
         
 torch.save(model.state_dict(), os.path.join(model_dir, "end.pth"))
 
