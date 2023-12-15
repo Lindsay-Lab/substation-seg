@@ -29,7 +29,7 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
         self.image_filenames = image_files
         self.in_channels=in_channels
         self.use_timepoints = use_timepoints
-        
+        self.normalizing_factor = normalizing_factor
     def __getitem__(self, index):
         # load images and masks
         image_filename = self.image_filenames[index]
@@ -43,7 +43,7 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
             image = image[[3,2,1],:,:]
         else:
             image = image[:self.in_channels,:,:]
-        image = np.clip(image/normalizing_factor,0,1)
+        image = np.clip(image/self.normalizing_factor,0,1)
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #inchannels,228,228
@@ -97,7 +97,7 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         self.image_filenames = image_files
         self.in_channels=in_channels
         self.use_timepoints = use_timepoints
-        
+        self.normalizing_factor = normalizing_factor
     def __getitem__(self, index):
         # load images and masks
         image_filename = self.image_filenames[index]
@@ -116,7 +116,7 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         else:
             image = image[:self.in_channels,:,:]
             
-        image = np.clip(image/normalizing_factor,0,1)
+        image = np.clip(image/self.normalizing_factor,0,1)
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #3x228x228
@@ -172,7 +172,8 @@ class FullImageDataset(torch.utils.data.Dataset):
         self.image_filenames = image_files
         self.in_channels=in_channels
         self.use_timepoints = use_timepoints 
-        
+        self.normalizing_factor = normalizing_factor
+    
     def __getitem__(self, index):
         image_filename = self.image_filenames[index]
         image_path = os.path.join(self.image_dir, image_filename)
@@ -191,7 +192,7 @@ class FullImageDataset(torch.utils.data.Dataset):
             image = image[:self.in_channels,:,:]
 
         #standardizing image
-        image = image/normalizing_factor     
+        image = image/self.normalizing_factor     
         
         mask = np.load(mask_path)['arr_0']
         mask[mask != 3] = 0
