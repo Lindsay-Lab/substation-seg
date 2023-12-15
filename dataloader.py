@@ -4,7 +4,23 @@ import matplotlib.pyplot as plt
 import os
 
 class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False):
+    '''
+    This dataset contains images with the following shape: Cx64x64. Each image has been cropped out around the substation.
+    Each timepoint has been stored as an individual image. However, since the mask is same for all of the individual timepoints, it is not saved again, rather it is referenced from original repo.
+    
+    Parameters:
+    data_dir: Folder with the image and mask folders
+    image_files: list of images to be included in the dataset
+    in_channels: number of channels to be included per image. Max is 13
+    geo_transforms: transformations like rotate, crop, flip, etc. Identical transformations are applied to the image and the mask.
+    color_transforms: transformations like color jitter. These are not applied to the mask.
+    use_timepoints: NOT USED-> need to removed
+    normalizing_factor: factor to bring images to (0,1) scale.
+    
+    Returns:
+    image,mask -> ((in_channels,64,64),(1,64,64))
+    '''
+    def __init__(self, data_dir, image_files, in_channels=13, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor=4000):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -27,7 +43,7 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
             image = image[[3,2,1],:,:]
         else:
             image = image[:self.in_channels,:,:]
-        image = np.clip(image/4000,0,1)
+        image = np.clip(image/normalizing_factor,0,1)
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #inchannels,228,228
@@ -57,7 +73,22 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
         
 
 class CroppedSegmentationDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False):
+    '''
+    This dataset contains images with the following shape: TxCx64x64. Each image and mask has been cropped out around the substation.
+    
+    Parameters:
+    data_dir: Folder with the image and mask folders
+    image_files: list of images to be included in the dataset
+    in_channels: number of channels to be included per image. Max is 13
+    geo_transforms: transformations like rotate, crop, flip, etc. Identical transformations are applied to the image and the mask.
+    color_transforms: transformations like color jitter. These are not applied to the mask.
+    use_timepoints: if True, images from all timepoints are stacked along the channel. This results in images of the following shape: (T*CxHxW) Else, median across all timepoints is computed. 
+    normalizing_factor: factor to bring images to (0,1) scale.
+    
+    Returns:
+    image,mask -> ((in_channels,64,64),(1,64,64))
+    '''
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor=4000):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -82,8 +113,10 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
             
         if self.in_channels==3:
             image = image[[3,2,1],:,:]
-        
-        image = np.clip(image/4000,0,1)
+        else:
+            image = image[:self.in_channels,:,:]
+            
+        image = np.clip(image/normalizing_factor,0,1)
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #3x228x228
@@ -114,7 +147,23 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         
 
 class FullImageDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False):
+    '''
+    This dataset contains images with the following shape: TxCx228x228.
+    
+    Parameters:
+    data_dir: Folder with the image and mask folders
+    image_files: list of images to be included in the dataset
+    in_channels: number of channels to be included per image. Max is 13
+    geo_transforms: transformations like rotate, crop, flip, etc. Identical transformations are applied to the image and the mask.
+    color_transforms: transformations like color jitter. These are not applied to the mask.
+    use_timepoints: if True, images from all timepoints are stacked along the channel. This results in images of the following shape: (T*CxHxW) Else, median across all timepoints is computed. 
+    normalizing_factor: factor to bring images to (0,1) scale.
+    
+    Returns:
+    image,mask -> ((in_channels,64,64),(1,64,64))
+    '''
+        
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor = 5000):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -142,7 +191,7 @@ class FullImageDataset(torch.utils.data.Dataset):
             image = image[:self.in_channels,:,:]
 
         #standardizing image
-        image = image/5000     
+        image = image/normalizing_factor     
         
         mask = np.load(mask_path)['arr_0']
         mask[mask != 3] = 0
