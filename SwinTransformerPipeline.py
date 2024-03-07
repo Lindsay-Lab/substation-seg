@@ -1,6 +1,8 @@
 import os
 import random
 import numpy as np
+import pickle
+
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 import torch.nn as nn
@@ -26,7 +28,7 @@ from dataloader import FullImageDataset
 # from models import setup_model
 
 
-args = utils.parse_arguments()
+args = utils.parse_arguments(True)
 
 
 if not os.path.isdir(args.model_dir):
@@ -44,28 +46,33 @@ mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,tra
 
 image_dir = os.path.join(args.data_dir, 'image_stack')
 mask_dir = os.path.join(args.data_dir, 'mask')
-image_filenames = os.listdir(image_dir)
+
+# for multi-image
+with open("four_or_more_timepoints.pkl",'rb') as f:
+    image_filenames = pickle.load(f)
+    
+# image_filenames = os.listdir(image_dir)
 random.shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
 # data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor = 5000
-train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True)
-val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True)
+train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=True)
+val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=True)
 
-train_dataloader = data.DataLoader(train_dataset, batch_size=args.BATCH_SIZE, shuffle=True, pin_memory = True, num_workers = args.num_workers, drop_last=True)
-val_dataloader = data.DataLoader(val_dataset, batch_size=args.BATCH_SIZE, shuffle=False,  pin_memory = True,  num_workers = args.num_workers, drop_last=True)
+train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
+val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)
 
 
 
 
 #MODEL
 weights_manager = satlaspretrain_models.Weights()
-model = weights_manager.get_pretrained_model("Sentinel2_SwinB_SI_RGB", fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
+model = weights_manager.get_pretrained_model("Sentinel2_SwinB_MI_RGB", fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
 
 
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=10, min_lr=1e-7, eps=1e-08, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 5, threshold=0.01, threshold_mode='rel', cooldown=10, min_lr=1e-7, eps=1e-08, verbose=True)
 iou_metric = BinaryJaccardIndex(0.5) 
 
 
@@ -86,7 +93,7 @@ validation_ious = []
 min_val_loss = np.inf
 counter = 0
 
-for e in range(args.starting_epoch,args.starting_epoch+args.N_EPOCHS):    
+for e in range(args.starting_epoch,args.starting_epoch+args.epochs):    
     #Training
     train_loss=0
     model.train();

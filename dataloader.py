@@ -194,7 +194,9 @@ class FullImageDataset(torch.utils.data.Dataset):
 
 
         if self.use_timepoints: 
-            image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #t*13,h,w
+            image = image[:4,:,:,:]
+            image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #(4*channels,h,w)
+            
         else: 
             image = np.median(image, axis=0)
             
