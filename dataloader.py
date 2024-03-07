@@ -121,17 +121,16 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #3x228x228
         mask = torch.from_numpy(mask).float().unsqueeze(0) #1x228x228
-        
+        combined = torch.cat((image,mask), 0)
         if self.geo_transforms:
-            combined = torch.cat((image,mask), 0)
             combined = self.geo_transforms(combined)
-            image,mask = torch.split(combined, [self.in_channels,1], 0)
+            #image,mask = torch.split(combined, [self.in_channels,1], 0)
         
         if self.color_transforms:
-            image = self.color_transforms(image)
+            combined[:self.in_channels,:,:]= self.color_transforms(combined[:self.in_channels,:,:])
         
         
-        return image, mask
+        return combined[:self.in_channels,:,:], combined[self.in_channels:,:,:]
 
     def __len__(self):
         return len(self.image_filenames)
@@ -156,41 +155,50 @@ class FullImageDataset(torch.utils.data.Dataset):
     in_channels: number of channels to be included per image. Max is 13
     geo_transforms: transformations like rotate, crop, flip, etc. Identical transformations are applied to the image and the mask.
     color_transforms: transformations like color jitter. These are not applied to the mask.
+    image_resize : Resizing operation on images
+    mask_resize : Resizing operation on masks
     use_timepoints: if True, images from all timepoints are stacked along the channel. This results in images of the following shape: (T*CxHxW) Else, median across all timepoints is computed. 
     normalizing_factor: factor to bring images to (0,1) scale.
-    
+    mask_2d: if true, returns mask with dimension (2,h,w)  else returns with dimension (1,h,w)
     Returns:
     image,mask -> ((in_channels,64,64),(1,64,64))
     '''
         
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor = 5000):
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor = 5000, mask_2d=False):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
-        self.image_dir = os.path.join(data_dir, 'image_stack')
-        self.mask_dir = os.path.join(data_dir, 'mask')
-        self.image_filenames = image_files
+        self.image_resize = image_resize
+        self.mask_resize = mask_resize
         self.in_channels=in_channels
         self.use_timepoints = use_timepoints 
         self.normalizing_factor = normalizing_factor
-    
+        self.mask_2d = mask_2d
+        
+        self.image_dir = os.path.join(data_dir, 'image_stack')
+        self.mask_dir = os.path.join(data_dir, 'mask')
+        self.image_filenames = image_files
+        
     def __getitem__(self, index):
         image_filename = self.image_filenames[index]
         image_path = os.path.join(self.image_dir, image_filename)
         mask_filename = image_filename
         mask_path = os.path.join(self.mask_dir, mask_filename)
+        
+        image = np.load(image_path)['arr_0'] # t x 13 x h x w 
+        
+        if self.in_channels==3:
+            image = image[:,[3,2,1],:,:]
+        else:
+            image = image[:,:self.in_channels,:,:]
+
 
         if self.use_timepoints: 
-            image = np.load(image_path)['arr_0'] # t x 13 x h x w 
-            image = np.reshape(image, (-1, image.shape[2], image.shape[3]))
+            image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #t*13,h,w
         else: 
-            image = np.median(np.load(image_path)['arr_0'], axis=0)
+            image = np.median(image, axis=0)
             
-        if self.in_channels==3:
-            image = image[[3,2,1],:,:]
-        else:
-            image = image[:self.in_channels,:,:]
-
+        
         #standardizing image
         image = image/self.normalizing_factor     
         
@@ -202,13 +210,27 @@ class FullImageDataset(torch.utils.data.Dataset):
         mask = torch.from_numpy(mask).float()
         mask = mask.unsqueeze(dim=0)
         
+        if self.mask_2d:
+            mask_0 = 1.0-mask
+            mask = torch.concat([mask_0, mask], dim = 0)
+            
+        # IMAGE AND MASK TRANSFORMATIONS
         if self.geo_transforms:
             combined = torch.cat((image,mask), 0)
             combined = self.geo_transforms(combined)
-            image,mask = torch.split(combined, [self.in_channels,1], 0)
+            image,mask = torch.split(combined, [image.shape[0],mask.shape[0]], 0)
         
         if self.color_transforms:
             image = self.color_transforms(image)
+        
+        if self.image_resize:
+            image = self.image_resize(image)
+        
+        if self.mask_resize:
+            mask = self.mask_resize(mask)
+        
+        #clipping image to 0,1 range
+        image = torch.clip(image, 0,1)
             
         return image, mask
 
@@ -218,7 +240,7 @@ class FullImageDataset(torch.utils.data.Dataset):
     def plot(self):     
         index = np.random.randint(0, self.__len__())
         image, mask = self.__getitem__(index)
-        fig, axs = plt.subplots(1,2)
+        fig, axs = plt.subplots(1,2, figsize = (15,15))
         axs[0].imshow(image.permute(1,2,0))
         axs[1].imshow(image.permute(1,2,0))
         axs[1].imshow(mask.permute(1,2,0), alpha=0.5, cmap='gray')
