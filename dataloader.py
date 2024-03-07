@@ -16,11 +16,13 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
     color_transforms: transformations like color jitter. These are not applied to the mask.
     use_timepoints: NOT USED-> need to removed
     normalizing_factor: factor to bring images to (0,1) scale.
+    image_resize : Resizing operation on images
+    mask_resize : Resizing operation on masks
     
     Returns:
     image,mask -> ((in_channels,64,64),(1,64,64))
     '''
-    def __init__(self, data_dir, image_files, in_channels=13, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor=4000):
+    def __init__(self, data_dir, image_files, in_channels=13, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor=4000):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -30,6 +32,9 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
         self.in_channels=in_channels
         self.use_timepoints = use_timepoints
         self.normalizing_factor = normalizing_factor
+        self.image_resize = image_resize
+        self.mask_resize = mask_resize
+        
     def __getitem__(self, index):
         # load images and masks
         image_filename = self.image_filenames[index]
@@ -43,7 +48,8 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
             image = image[[3,2,1],:,:]
         else:
             image = image[:self.in_channels,:,:]
-        image = np.clip(image/self.normalizing_factor,0,1)
+        
+        image = image/self.normalizing_factor
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #inchannels,228,228
@@ -52,10 +58,18 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
         if self.geo_transforms:
             combined = torch.cat((image,mask), 0)
             combined = self.geo_transforms(combined)
-            image,mask = torch.split(combined, [self.in_channels,1], 0)
+            image,mask = torch.split(combined, [image.shape[0],mask.shape[0]], 0)
         
         if self.color_transforms:
             image = self.color_transforms(image)
+            
+        if self.image_resize:
+            image = self.image_resize(image)
+        
+        if self.mask_resize:
+            mask = self.mask_resize(mask)
+        
+        image = torch.clip(image,0,1)
         
         return image, mask
 
@@ -84,11 +98,13 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
     color_transforms: transformations like color jitter. These are not applied to the mask.
     use_timepoints: if True, images from all timepoints are stacked along the channel. This results in images of the following shape: (T*CxHxW) Else, median across all timepoints is computed. 
     normalizing_factor: factor to bring images to (0,1) scale.
+    image_resize : Resizing operation on images
+    mask_resize : Resizing operation on masks
     
     Returns:
     image,mask -> ((in_channels,64,64),(1,64,64))
     '''
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor=4000):
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor=4000):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -98,6 +114,9 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         self.in_channels=in_channels
         self.use_timepoints = use_timepoints
         self.normalizing_factor = normalizing_factor
+        self.image_resize = image_resize
+        self.mask_resize = mask_resize
+    
     def __getitem__(self, index):
         # load images and masks
         image_filename = self.image_filenames[index]
@@ -105,33 +124,45 @@ class CroppedSegmentationDataset(torch.utils.data.Dataset):
         mask_filename = image_filename
         mask_path = os.path.join(self.mask_dir, mask_filename)
         
-        if self.use_timepoints: 
-            image = np.load(image_path) # t x 13 x h x w 
-            image = np.reshape(image, (-1, image.shape[2], image.shape[3]))
-        else: 
-            image = np.median(np.load(image_path), axis=0)
-            
+        image = np.load(image_path)
+        
         if self.in_channels==3:
-            image = image[[3,2,1],:,:]
+            image = image[:,[3,2,1],:,:]  #(t,3,h,w) 
         else:
-            image = image[:self.in_channels,:,:]
+            image = image[:,:self.in_channels,:,:] #(t,in_channels,h,w) 
+        
+        if self.use_timepoints: 
+             # t x 13 x h x w 
+            image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #(t*in_channels,h,w) 
+        else: 
+            image = np.median(image, axis=0) #(in_channels,h,w) 
             
-        image = np.clip(image/self.normalizing_factor,0,1)
+            
+        image = image/self.normalizing_factor
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #3x228x228
         mask = torch.from_numpy(mask).float().unsqueeze(0) #1x228x228
-        combined = torch.cat((image,mask), 0)
+        
+        
         if self.geo_transforms:
+            combined = torch.cat((image,mask), 0)
             combined = self.geo_transforms(combined)
-            #image,mask = torch.split(combined, [self.in_channels,1], 0)
+            image,mask = torch.split(combined, [image.shape[0],mask.shape[0]], 0)
         
         if self.color_transforms:
-            combined[:self.in_channels,:,:]= self.color_transforms(combined[:self.in_channels,:,:])
+            image = self.color_transforms(image)
+            
+        if self.image_resize:
+            image = self.image_resize(image)
         
+        if self.mask_resize:
+            mask = self.mask_resize(mask)
         
-        return combined[:self.in_channels,:,:], combined[self.in_channels:,:,:]
-
+        image = torch.clip(image,0,1)
+        
+        return image, mask
+        
     def __len__(self):
         return len(self.image_filenames)
 

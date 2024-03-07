@@ -1,6 +1,7 @@
 import os
 import pickle
 import numpy as np
+import pandas as pd
 import random 
 import matplotlib.pyplot as plt
 import torch.nn as nn
@@ -15,6 +16,7 @@ import torchvision.transforms as transforms
 from torchvision.ops import sigmoid_focal_loss
 import segmentation_models_pytorch as smp
 from torchvision.ops import masks_to_boxes
+from torchmetrics.classification import BinaryJaccardIndex
 
 from torchgeo.models import ResNet18_Weights,ResNet50_Weights
 
@@ -26,33 +28,17 @@ import models
 
 
 #Parameters
-args = utils.parse_arguments()
-data_dir= r"/scratch/kj1447/gracelab/dataset"
-model_dir = os.path.join("/scratch/kj1447/gracelab/models",args.model_dir)
-loss_type = args.loss
-N_EPOCHS = args.epochs
-BATCH_SIZE = args.batch_size
-num_workers = args.workers
-train_ratio = args.train_ratio
-learning_rate = args.learning_rate
-lookback = args.lookback
-seed = args.seed
-starting_epoch = args.starting_epoch
-resume = args.resume_training
-in_channels = args.in_channels
-use_timepoints = args.use_timepoints
+args = utils.parse_arguments(True)
 
-kind = args.model_type
-pretrained=args.pretrained
-if pretrained:
-    if in_channels == 3:
+if args.pretrained:
+    if args.in_channels == 3:
         weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
     else:
         weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
 else:
     weights = None
     
-if resume:
+if args.resume_training:
     checkpoint_path = args.checkpoint  # Replace with your file path
 else:
     checkpoint_path = None
@@ -72,38 +58,33 @@ geo_transform = transforms.Compose([
     transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
 ])
 
-color_transform = transforms.Compose([
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-])
+if in_channels==3:
+    color_transform = transforms.Compose([
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+    ])
+else:
+    color_transform=None
+
+#not using resizing at the moment. But can be passed in the Dataset Class Object    
+image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
+mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,transforms.InterpolationMode.NEAREST, antialias=True)])
 
 
-image_dir = os.path.join(data_dir, 'image_stack_cropped_per_time') #Select which directory you want to read images from
-mask_dir = os.path.join(data_dir, 'mask_cropped')
-image_filenames = os.listdir(image_dir)
-# random.shuffle(image_filenames) #comment in case you read from folder where each timepoint has been saved as an individual image. This is to prevent leakage between train and val set
-train_set = image_filenames[:int(train_ratio*len(image_filenames))]
-val_set = image_filenames[int(train_ratio*len(image_filenames)):]
+mapping_df = pd.read_csv('dataset/MappingCroppedPerTimeToFullImage.csv')
+train_set = list(mapping_df.loc[mapping_df.Set =='Train', 'CroppedPerTime'])
+val_set = list(mapping_df.loc[mapping_df.Set =='Val', 'CroppedPerTime'])
+print(len(train_set), len(val_set))
 
 
-#logic to exclude images with less than 5 timepoints
-# with open("dataset/exclude_list","rb") as f:
-#     exclude_list = pickle.load(f)
-# image_filenames_sub = [x for x in image_filenames if x not in exclude_list]
+train_dataset = CroppedSegmentationPerTimeDataset(data_dir = args.data_dir, image_files=train_set, in_channels=args.in_channels, geo_transforms=geo_transform, color_transforms= color_transform, use_timepoints=args.use_timepoints, normalizing_factor=args.normalizing_factor)
+val_dataset = CroppedSegmentationPerTimeDataset(data_dir = args.data_dir, image_files=val_set, in_channels=args.in_channels, geo_transforms=None, color_transforms= None, use_timepoints=args.use_timepoints, normalizing_factor=args.normalizing_factor)
 
-# print(len(image_filenames), len(exclude_list), len(image_filenames_sub))
-# random.shuffle(image_filenames_sub)
-# train_set = image_filenames_sub[:int(train_ratio*len(image_filenames_sub))]
-# val_set = image_filenames_sub[int(train_ratio*len(image_filenames_sub)):]
-
-train_dataset = CroppedSegmentationPerTimeDataset(data_dir = data_dir, image_files=train_set, geo_transforms=geo_transform, color_transforms= None)
-val_dataset = CroppedSegmentationPerTimeDataset(data_dir = data_dir, image_files=val_set, geo_transforms=None, color_transforms= None)
-train_dataloader = data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory = True, num_workers = num_workers)
-val_dataloader = data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False,  pin_memory = True,  num_workers = num_workers)
-
+train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers)
+val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers)
 
 
 #MODELS
-model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=weights, in_channels=in_channels, resume=resume, checkpoint_path= checkpoint_path)
+model = models.setup_model(kind=args.model_type, in_channels=args.in_channels, pretrained=args.pretrained, pretrained_weights=weights, resume=args.resume_training, checkpoint_path=checkpoint_path)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():
@@ -111,19 +92,20 @@ model = models.setup_model(kind=kind, pretrained=pretrained, pretrained_weights=
 #         param.requires_grad=False
 
 
-if loss_type == 'BCE':
+if args.loss == 'BCE':
     criterion = nn.BCEWithLogitsLoss()
-elif loss_type == 'DICE':
+elif args.loss == 'DICE':
     criterion = smp.losses.DiceLoss(mode ='binary')
-    
+iou_metric = BinaryJaccardIndex(0.5)      
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 10, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08, verbose=True)
 
 
 if torch.cuda.is_available():
     print("Using GPU")
     device = torch.device("cuda:0")
     model = model.to(device)
+    iou_metric = iou_metric.to(device)
 else:
     device = torch.device("cpu")
 
@@ -168,19 +150,9 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
             else:
                 loss = criterion(output, target)
             output = torch.sigmoid(output)
-            pred_mask = (output > 0.5).float()
-            val_batch_iou = []
-            for pred, true in zip(pred_mask, target):
-                pred = torch.squeeze(pred, dim=0)
-                true = torch.squeeze(true, dim=0)
-
-                intersection = torch.logical_and(pred, true).sum().item()
-                union = torch.logical_or(pred, true).sum().item()
-                iou = intersection / union if union > 0 else 0.0
-                val_batch_iou.append(iou)
-            val_batch_iou = torch.tensor(val_batch_iou).mean()
-
-            val_iou +=val_batch_iou.item()
+#             pred_mask = (output > 0.5).float()
+            iou = iou_metric(output, target)
+            val_iou+=iou.item()
             val_loss += loss.item()            
         val_iou = val_iou/len(val_dataloader)
         val_loss = val_loss/len(val_dataloader)

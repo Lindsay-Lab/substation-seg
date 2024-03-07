@@ -49,7 +49,7 @@ mask_dir = os.path.join(args.data_dir, 'mask')
 
 # for multi-image
 if args.use_timepoints:
-    with open("four_or_more_timepoints.pkl",'rb') as f:
+    with open("dataset/four_or_more_timepoints.pkl",'rb') as f:
         image_filenames = pickle.load(f)
 else:
     image_filenames = os.listdir(image_dir)
