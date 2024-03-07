@@ -100,7 +100,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
     #Training
     train_loss=0
     model.train()
-    learning_rates.append(scheduler.get_last_lr())
+    
     for i , batch in enumerate(train_dataloader):
         optimizer.zero_grad()
         data, target = batch[0].to(device).float(), batch[1].to(device)
@@ -150,6 +150,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
     scheduler.print_lr()
+    learning_rates.append(scheduler.get_last_lr())
     
     if counter>=args.lookback:
         print("Early Stopping Reached")
