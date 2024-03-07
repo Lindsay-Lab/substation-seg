@@ -48,17 +48,19 @@ image_dir = os.path.join(args.data_dir, 'image_stack')
 mask_dir = os.path.join(args.data_dir, 'mask')
 
 # for multi-image
-with open("four_or_more_timepoints.pkl",'rb') as f:
-    image_filenames = pickle.load(f)
-    
-# image_filenames = os.listdir(image_dir)
+if args.use_timepoints:
+    with open("four_or_more_timepoints.pkl",'rb') as f:
+        image_filenames = pickle.load(f)
+else:
+    image_filenames = os.listdir(image_dir)
+
 random.shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
 # data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor = 5000
-train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=True)
-val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=True)
+train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints)
+val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints)
 
 train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
 val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)
@@ -90,13 +92,15 @@ else:
 training_losses = []
 validation_losses = []
 validation_ious = []
+learning_rates=[]
 min_val_loss = np.inf
 counter = 0
 
 for e in range(args.starting_epoch,args.starting_epoch+args.epochs):    
     #Training
     train_loss=0
-    model.train();
+    model.train()
+    learning_rates.append(scheduler.get_last_lr())
     for i , batch in enumerate(train_dataloader):
         optimizer.zero_grad()
         data, target = batch[0].to(device).float(), batch[1].to(device)
@@ -145,6 +149,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
 
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
+    scheduler.print_lr()
     
     if counter>=args.lookback:
         print("Early Stopping Reached")
@@ -152,13 +157,10 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         
 torch.save(model.state_dict(), os.path.join(args.model_dir, "end.pth"))
 
-print("Training Losses")
-print(training_losses)
-print("Val Losses")
-print(validation_losses)
-print("Val IOUs")
-print(validation_ious)
-
+print("train_loss = ",training_losses)
+print("val_loss = ",validation_losses)
+print("val_iou = ", validation_ious)
+print("learning_rates = ", learning_rates)
 
 
 
