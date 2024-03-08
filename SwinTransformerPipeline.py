@@ -12,10 +12,6 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
-from torchvision.ops import sigmoid_focal_loss
-import segmentation_models_pytorch as smp
-from torchgeo.models import ResNet50_Weights,ResNet50_Weights
-from transformers import SwinConfig, UperNetConfig, UperNetForSemanticSegmentation
 from torchmetrics.classification import BinaryJaccardIndex
 
 import satlaspretrain_models
@@ -55,6 +51,7 @@ else:
     image_filenames = os.listdir(image_dir)
 
 random.Random(args.seed).shuffle(image_filenames)
+
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
@@ -149,8 +146,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
 
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
-#     scheduler.print_lr()
-    learning_rates.append(scheduler.get_last_lr())
+    learning_rates.append(scheduler.get_last_lr()[0])
     
     if counter>=args.lookback:
         print("Early Stopping Reached")
