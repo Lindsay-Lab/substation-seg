@@ -37,7 +37,7 @@ mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,tra
 image_dir = os.path.join(args.data_dir, 'image_stack')
 mask_dir = os.path.join(args.data_dir, 'mask')
 image_filenames = os.listdir(image_dir)
-random.shuffle(image_filenames)
+random.Random(args.seed).shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 

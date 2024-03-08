@@ -54,7 +54,7 @@ if args.use_timepoints:
 else:
     image_filenames = os.listdir(image_dir)
 
-random.shuffle(image_filenames)
+random.Random(args.seed).shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
@@ -149,7 +149,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
 
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
-    scheduler.print_lr()
+#     scheduler.print_lr()
     learning_rates.append(scheduler.get_last_lr())
     
     if counter>=args.lookback:
