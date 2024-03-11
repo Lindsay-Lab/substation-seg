@@ -2,6 +2,8 @@ import argparse
 import torch
 import random
 import os
+from torchgeo.models import ResNet18_Weights,ResNet50_Weights
+
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -33,7 +35,8 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-p", "--pretrained",  action="store_true",  help = "Use Pretrained Model")
         parser.add_argument("-cp", "--checkpoint", help = "Path for checkpoint")
         parser.add_argument("-nf","--normalizing_factor", default=4000, type = int, help='Normalizing Factor for images')
-        args = parser.parse_args()
+        parser.add_argument("-lu", "--learned_upsampling",  action="store_true",  help = "Flag to train Deconvolution Layers on top of Swin Transformer")
+        args = vars(parser.parse_args())
     
     else:       
         # if cmdline arguments can't be passed. eg. when running through a jupyter notebook
@@ -58,12 +61,40 @@ def parse_arguments(cmd_flag=False):
         args['pretrained']=False
         args['checkpoint']=None
         args['use_timepoints']=False
-        args = dotdict(args)
+        args['learned_upsampling']=False
     
-    print(args)
+    args = dotdict(args)
+    args = sanity_checks(args)
     return args
 
-
+def sanity_checks(args):
+    
+    if args.pretrained:
+        assert args.pretrained_weights is not None
+    if args.resume_training:
+        assert args.checkpoint is not None
+        assert os.path.exists(args.checkpoint)
+    
+    if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' :
+        if args.pretrained:
+            if args.in_channels == 3:
+                args.pretrained_weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
+            else:
+                args.pretrained_weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+        else:
+            args.pretrained_weights = None
+        
+    elif args.model_type=='swin':
+        if args.in_channels ==3:    
+            if args.use_timepoints:
+                args.pretrained_weights = "Sentinel2_SwinB_MI_RGB"
+            else:
+                args.pretrained_weights = "Sentinel2_SwinB_SI_RGB"
+        else:
+            raise Exception("SWIN Backbone not Implemented with Multi Channel input")    
+    return args
+    
+    
 def set_seed(seed):
     #setting seed for reproducibility
     torch.manual_seed(seed)
