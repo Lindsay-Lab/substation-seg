@@ -2,24 +2,66 @@ import segmentation_models_pytorch as smp
 from torchvision.models._api import WeightsEnum
 from torch import nn
 import torch 
+import satlaspretrain_models
 
-def setup_model(kind, in_channels, pretrained, pretrained_weights, resume, checkpoint_path=None):
+class SwinWithUpSample(nn.Module):
+    def __init__(self, fpn_model):
+        super(SwinWithUpSample, self).__init__()
+        self.mid_channels = 128
+        self.num_outputs=2
+        self.fpn_model = fpn_model
+        self.upsampler = nn.Sequential(
+            nn.Conv2d(self.mid_channels, self.mid_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(self.mid_channels, self.mid_channels // 2, kernel_size=2, stride=2),
+            nn.Conv2d(self.mid_channels // 2, self.mid_channels // 2, kernel_size=3, padding=1),
+            #nn.BatchNorm2d(self.mid_channels // 2),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(self.mid_channels // 2, self.mid_channels // 4, kernel_size=2, stride=2),
+            nn.Conv2d(self.mid_channels // 4, self.mid_channels // 4, kernel_size=3, padding=1),
+            #nn.BatchNorm2d(self.mid_channels // 4),
+            nn.ReLU(inplace=True),
+
+            torch.nn.Conv2d(self.mid_channels//4, self.num_outputs, 3, padding=1),
+        )
+                
+        def loss_func(logits, targets):
+            targets = targets.argmax(dim=1)
+            return torch.nn.functional.cross_entropy(logits, targets, reduction='none')[:, None, :, :]
+        self.loss_func = loss_func
+        
+        
+    def forward(self, image, target=None):
+        loss=None
+        feature = self.fpn_model(image)
+        raw_outputs = self.upsampler(feature[0])
+        outputs = torch.nn.functional.softmax(raw_outputs, dim=1)
+        if target is not None:
+            #task_targets = torch.stack([target for target in targets], dim=0).float()
+            loss = self.loss_func(raw_outputs, target)
+            loss = loss.mean()
+        return outputs, loss
+        
+#kind='vanilla_unet', in_channels=3, pretrained=False, pretrained_weights=None, resume=False,checkpoint_path=None,  args=None
+def setup_model(args):
     
-    if kind == 'vanilla_unet':        
+    if args.model_type == 'vanilla_unet':        
         model = smp.Unet(
             encoder_name="resnet18",       
             encoder_weights=None,     
-            in_channels=in_channels,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+            in_channels=args.in_channels,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=1,                      # model output channels (number of classes in your dataset)
         #     activation = 'sigmoid'     # because using sigmoid_focal_loss
         )
     
-    elif kind == 'modified_unet':
+    elif args.model_type == 'modified_unet':
         
         class ModifiedUNET(nn.Module):
             def __init__(self):
                 super(ModifiedUNET, self).__init__()
-                self.unet = smp.Unet(encoder_name="resnet50", encoder_weights=None, in_channels=in_channels, classes=1)
+                self.unet = smp.Unet(encoder_name="resnet50", encoder_weights=None, in_channels = args.in_channels, classes=1)
                 self.unet.decoder.blocks[3].conv1[0] = nn.Conv2d(128, 32, kernel_size=(5, 5), stride=(1, 1), bias=False)
                 self.unet.decoder.blocks[3].conv2[0] = nn.Conv2d(32, 32, kernel_size=(5, 5), stride=(1, 1), bias=False)
                 self.unet.decoder.blocks[4].conv1[0] = nn.Conv2d(32, 16, kernel_size=(5, 5), stride=(1, 1), bias=False)
@@ -31,20 +73,32 @@ def setup_model(kind, in_channels, pretrained, pretrained_weights, resume, check
                 return x 
         
         model = ModifiedUNET()
+        
+    elif args.model_type == 'swin':
+        if args.learned_upsample:
+            #MODEL with learned upsampling
+            weights_manager = satlaspretrain_models.Weights()
+            fpn_model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True,)
+            model = SwinWithUpSample(fpn_model)
+        else:
+            weights_manager = satlaspretrain_models.Weights()
+            model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
+
     else:
         raise Exception("Incorrect Model Selected")
-    if pretrained: 
-        assert pretrained_weights is not None
-        if isinstance(pretrained_weights, WeightsEnum):
-            state_dict = pretrained_weights.get_state_dict(progress=True)
+    
+    if args.pretrained: 
+        #assert pretrained_weights is not None
+        if isinstance(args.pretrained_weights, WeightsEnum):
+            state_dict = args.pretrained_weights.get_state_dict(progress=True)
             if kind == 'modified_unet':
                 model.unet.encoder.load_state_dict(state_dict)
             elif kind == 'vanilla_unet': 
                 model.encoder.load_state_dict(state_dict)
      
-    if resume:
-        assert checkpoint_path is not None
-        checkpoint = torch.load(checkpoint_path)
+    if args.resume_training:
+        #assert args.checkpoint is not None
+        checkpoint = torch.load(args.checkpoint)
         model.load_state_dict(checkpoint)
         
     return model
