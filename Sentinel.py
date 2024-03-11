@@ -50,8 +50,8 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffl
 
 #MODEL
 
-weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
-model = setup_model(args.model_type, in_channels=args.in_channels , pretrained=args.pretrained, pretrained_weights=weights, resume=args.resume_training, checkpoint_path=args.checkpoint)
+# weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+model = setup_model(args)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():
@@ -64,7 +64,7 @@ elif args.loss == 'DICE':
     criterion = smp.losses.DiceLoss(mode ='binary')
     
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=10, min_lr=1e-7, eps=1e-08, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=10, min_lr=1e-7, eps=1e-08)
 iou_metric = BinaryJaccardIndex(0.5) 
 iou_metric = iou_metric.to(device)
 
@@ -80,6 +80,7 @@ else:
 training_losses = []
 validation_losses = []
 validation_ious = []
+learning_rates=[]
 min_val_loss = np.inf
 counter = 0
 
@@ -148,6 +149,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
 
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
+    learning_rates.append(scheduler.get_last_lr()[0])
     
     if counter>=lookback:
         print("Early Stopping Reached")
@@ -158,4 +160,4 @@ torch.save(model.state_dict(), os.path.join(model_dir, "end.pth"))
 print("train_loss = ",training_losses)
 print("val_loss = ",validation_losses)
 print("val_iou = ", validation_ious)
-
+print("learning_rates = ", learning_rates)

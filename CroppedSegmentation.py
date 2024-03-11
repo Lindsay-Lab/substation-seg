@@ -30,19 +30,6 @@ import models
 #Parameters
 args = utils.parse_arguments(True)
 
-if args.pretrained:
-    if args.in_channels == 3:
-        weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
-    else:
-        weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
-else:
-    weights = None
-    
-if args.resume_training:
-    checkpoint_path = args.checkpoint  # Replace with your file path
-else:
-    checkpoint_path = None
-
     
 if not os.path.isdir(model_dir):
     os.mkdir(model_dir)
@@ -73,7 +60,7 @@ mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,tra
 mapping_df = pd.read_csv('dataset/MappingCroppedPerTimeToFullImage.csv')
 train_set = list(mapping_df.loc[mapping_df.Set =='Train', 'CroppedPerTime'])
 val_set = list(mapping_df.loc[mapping_df.Set =='Val', 'CroppedPerTime'])
-print(len(train_set), len(val_set))
+# print(len(train_set), len(val_set))
 
 
 train_dataset = CroppedSegmentationPerTimeDataset(data_dir = args.data_dir, image_files=train_set, in_channels=args.in_channels, geo_transforms=geo_transform, color_transforms= color_transform, use_timepoints=args.use_timepoints, normalizing_factor=args.normalizing_factor)
@@ -84,7 +71,7 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffl
 
 
 #MODELS
-model = models.setup_model(kind=args.model_type, in_channels=args.in_channels, pretrained=args.pretrained, pretrained_weights=weights, resume=args.resume_training, checkpoint_path=checkpoint_path)
+model = models.setup_model(args)
 
 #FREEZE MODEL
 # for name, param in model.named_parameters():
@@ -98,7 +85,7 @@ elif args.loss == 'DICE':
     criterion = smp.losses.DiceLoss(mode ='binary')
 iou_metric = BinaryJaccardIndex(0.5)      
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=2, min_lr=1e-7, eps=1e-08)
 
 
 if torch.cuda.is_available():
@@ -113,6 +100,7 @@ else:
 training_losses = []
 validation_losses = []
 validation_ious = []
+learning_rates=[]
 min_val_loss = np.inf
 counter = 0
 
@@ -176,6 +164,7 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
 
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
+    learning_rates.append(scheduler.get_last_lr()[0])
     
     if counter>=lookback:
         print("Early Stopping Reached")
@@ -191,12 +180,9 @@ for e in range(starting_epoch,starting_epoch+N_EPOCHS):
         
 torch.save(model.state_dict(), os.path.join(model_dir, "end.pth"))
 
-print("Training Losses")
-print(training_losses)
-print("Val Losses")
-print(validation_losses)
-print("Val IOUs")
-print(validation_ious)
-
+print("train_loss = ",training_losses)
+print("val_loss = ",validation_losses)
+print("val_iou = ", validation_ious)
+print("learning_rates = ", learning_rates)
 
 

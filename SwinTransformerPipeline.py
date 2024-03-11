@@ -13,15 +13,13 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from torchmetrics.classification import BinaryJaccardIndex
-
-import satlaspretrain_models
+# import satlaspretrain_models
 
 #our files
 import utils
 from dataloader import FullImageDataset
 
-# import models
-# from models import setup_model
+from models import setup_model
 
 
 args = utils.parse_arguments(True)
@@ -39,6 +37,20 @@ random.seed(args.seed)
 image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
 mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,transforms.InterpolationMode.NEAREST, antialias=True)])
 
+geo_transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomRotation(degrees=15),
+#     transforms.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0)),
+    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
+])
+color_transform=None
+# if args.in_channels==3:
+#     color_transform = transforms.Compose([
+#         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+#     ])
+# else:
+#     color_transform=None
 
 image_dir = os.path.join(args.data_dir, 'image_stack')
 mask_dir = os.path.join(args.data_dir, 'mask')
@@ -56,18 +68,15 @@ train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
 # data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor = 5000
-train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints)
+train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor,  geo_transforms=geo_transform, color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints)
 val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints)
 
 train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
 val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)
 
 
-
-
 #MODEL
-weights_manager = satlaspretrain_models.Weights()
-model = weights_manager.get_pretrained_model("Sentinel2_SwinB_MI_RGB", fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
+model = setup_model(args)
 
 
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
