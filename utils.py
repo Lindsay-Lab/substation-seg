@@ -93,7 +93,7 @@ def sanity_checks(args):
             else:
                 args.pretrained_weights = "Sentinel2_SwinB_SI_RGB"
         else:
-            args.pretrained_weights = "	Sentinel2_SwinB_MI_MS"
+            args.pretrained_weights = "Sentinel2_SwinB_MI_MS"
             # raise Exception("SWIN Backbone not Implemented with Multi Channel input")
         
         args.normalizing_factor = np.array([[1187.   , 1836.   ,  649.   ],
