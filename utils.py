@@ -65,6 +65,7 @@ def parse_arguments(cmd_flag=False):
     
     args = dotdict(args)
     args = sanity_checks(args)
+    print(args)
     return args
 
 def sanity_checks(args):
@@ -91,7 +92,22 @@ def sanity_checks(args):
             else:
                 args.pretrained_weights = "Sentinel2_SwinB_SI_RGB"
         else:
-            raise Exception("SWIN Backbone not Implemented with Multi Channel input")    
+            args.pretrained_weights = "	Sentinel2_SwinB_MI_MS"
+            # raise Exception("SWIN Backbone not Implemented with Multi Channel input")
+        
+        args.normalizing_factor = np.array([[1187.   , 1836.   ,  649.   ],
+                                            [ 878.   , 1931.085, 1053.085],
+                                            [ 749.   , 1982.51 , 1233.51 ],
+                                            [ 478.   , 2287.17 , 1809.17 ],
+                                            [ 744.   , 2317.   , 1573.   ],
+                                            [1248.   , 3195.   , 1947.   ],
+                                            [1389.   , 3853.   , 2464.   ],
+                                            [1205.83 , 3840.335, 2634.505],
+                                            [1455.   , 4186.   , 2731.   ],
+                                            [ 462.   , 1084.   ,  622.   ],
+                                            [  10.   ,   16.   ,    6.   ],
+                                            [1053.   , 3444.68 , 2391.68 ],
+                                            [ 501.   , 2715.   , 2214.   ]])
     return args
     
     

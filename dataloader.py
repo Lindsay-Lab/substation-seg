@@ -35,6 +35,7 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
         self.image_resize = image_resize
         self.mask_resize = mask_resize
         
+        
     def __getitem__(self, index):
         # load images and masks
         image_filename = self.image_filenames[index]
@@ -43,13 +44,12 @@ class CroppedSegmentationPerTimeDataset(torch.utils.data.Dataset):
         mask_path = os.path.join(self.mask_dir, mask_filename)
         
         image = np.load(image_path)
+        image = image/self.normalizing_factor
         
         if self.in_channels==3:
             image = image[[3,2,1],:,:]
         else:
             image = image[:self.in_channels,:,:]
-        
-        image = image/self.normalizing_factor
         
         mask = np.load(mask_path)
         image = torch.from_numpy(image) #inchannels,228,228
@@ -195,7 +195,7 @@ class FullImageDataset(torch.utils.data.Dataset):
     image,mask -> ((in_channels,64,64),(1,64,64))
     '''
         
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor = 5000, mask_2d=False):
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor = 5000, mask_2d=False, , model_type ='swin'):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
@@ -205,6 +205,7 @@ class FullImageDataset(torch.utils.data.Dataset):
         self.use_timepoints = use_timepoints 
         self.normalizing_factor = normalizing_factor
         self.mask_2d = mask_2d
+        self.model_type = model_type
         
         self.image_dir = os.path.join(data_dir, 'image_stack')
         self.mask_dir = os.path.join(data_dir, 'mask')
@@ -218,23 +219,28 @@ class FullImageDataset(torch.utils.data.Dataset):
         
         image = np.load(image_path)['arr_0'] # t x 13 x h x w 
         
+        #standardizing image
+        if self.normalizing_factor == np.ndarray:
+            image = image- self.normalizing_factor[:,0].reshape((-1,1,1))/self.normalizing_factor[:,2].reshape((-1,1,1))
+        else:
+            image = image/self.normalizing_factor     
+        
+        #selecting channels
         if self.in_channels==3:
             image = image[:,[3,2,1],:,:]
         else:
-            image = image[:,:self.in_channels,:,:]
+            if self.model_type =='swin':
+                image = image[:,[3,2,1,4,5,6,7,8,11,12],:,:]  #swin only takes 9 channels
+            else: 
+                image = image[:,:self.in_channels,:,:]
 
-
+        #handling multiple images across timepoints
         if self.use_timepoints: 
             image = image[:4,:,:,:]
             image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #(4*channels,h,w)
-            
         else: 
             image = np.median(image, axis=0)
             
-        
-        #standardizing image
-        image = image/self.normalizing_factor     
-        
         mask = np.load(mask_path)['arr_0']
         mask[mask != 3] = 0
         mask[mask == 3] = 1
