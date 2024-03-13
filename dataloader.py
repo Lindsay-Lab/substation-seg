@@ -220,8 +220,8 @@ class FullImageDataset(torch.utils.data.Dataset):
         image = np.load(image_path)['arr_0'] # t x 13 x h x w 
         
         #standardizing image
-        if self.normalizing_factor == np.ndarray:
-            image = image- self.normalizing_factor[:,0].reshape((-1,1,1))/self.normalizing_factor[:,2].reshape((-1,1,1))
+        if type(self.normalizing_factor) == np.ndarray:
+            image = (image- self.normalizing_factor[:,0].reshape((-1,1,1)))/self.normalizing_factor[:,2].reshape((-1,1,1))
         else:
             image = image/self.normalizing_factor     
         
@@ -230,7 +230,7 @@ class FullImageDataset(torch.utils.data.Dataset):
             image = image[:,[3,2,1],:,:]
         else:
             if self.model_type =='swin':
-                image = image[:,[3,2,1,4,5,6,7,8,11,12],:,:]  #swin only takes 9 channels
+                image = image[:,[3,2,1,4,5,6,7,10,11],:,:]  #swin only takes 9 channels
             else: 
                 image = image[:,:self.in_channels,:,:]
 
