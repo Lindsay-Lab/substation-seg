@@ -195,7 +195,7 @@ class FullImageDataset(torch.utils.data.Dataset):
     image,mask -> ((in_channels,64,64),(1,64,64))
     '''
         
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor = 5000, mask_2d=False, , model_type ='swin'):
+    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor = 5000, mask_2d=False, model_type ='swin'):
         self.data_dir = data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
