@@ -17,4 +17,4 @@
 
 
 
-singularity exec --nv --overlay /scratch/kj1447/pytorch-example/overlay-25GB-500K.ext3:ro /scratch/work/public/singularity/cuda11.8.86-cudnn8.7-devel-ubuntu22.04.2.sif /bin/bash -c "source /ext3/env.sh; python3 /scratch/kj1447/gracelab/SwinTransformerPipeline.py --model_dir /scratch/kj1447/gracelab/models/SWIN_FPN_MultiImage_Upsampled_no_resize_Augmentation_percentile_norm --batch_size 20 --workers 20 --learning_rate 1e-4 --upsampled_mask_size 228 --upsampled_image_size 228 --in_channels 9 --seed 199 --model_type swin --use_timepoints --learned_upsampling"
+singularity exec --nv --overlay /scratch/kj1447/pytorch-example/overlay-25GB-500K.ext3:ro /scratch/work/public/singularity/cuda11.8.86-cudnn8.7-devel-ubuntu22.04.2.sif /bin/bash -c "source /ext3/env.sh; python3 /scratch/kj1447/gracelab/SwinTransformerPipeline.py --model_dir /scratch/kj1447/gracelab/models/SWIN_FPN_MultiImage_Upsampled_no_resize_Augmentation_percentile_norm --batch_size 8 --workers 8 --learning_rate 1e-4 --upsampled_mask_size 228 --upsampled_image_size 228 --in_channels 9 --seed 199 --model_type swin --normalizing_type percentile --use_timepoints --learned_upsampling"

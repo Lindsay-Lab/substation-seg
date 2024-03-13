@@ -35,6 +35,7 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-ut","--use_timepoints", action="store_true", help='use time channel (true/false)')
         parser.add_argument("-p", "--pretrained",  action="store_true",  help = "Use Pretrained Model")
         parser.add_argument("-cp", "--checkpoint", help = "Path for checkpoint")
+        parser.add_argument("-nt","--normalizing_type", default='percentile', help='Type of Normalization Used. Either "percentile" or "constant". If its is percentile, we use 1st and 99th percentile to perform linear scaling. Else a constant range is used.')
         parser.add_argument("-nf","--normalizing_factor", default=4000, type = int, help='Normalizing Factor for images')
         parser.add_argument("-lu", "--learned_upsampling",  action="store_true",  help = "Flag to train Deconvolution Layers on top of Swin Transformer")
         args = vars(parser.parse_args())
@@ -57,6 +58,7 @@ def parse_arguments(cmd_flag=False):
         args['upsampled_image_size']=256
         args['upsampled_mask_size']=64
         args['in_channels'] = 3
+        args['normalizing_type'] = "percentile"
         args['normalizing_factor'] = 4000
         args['model_type']='vanilla_unet'
         args['pretrained']=False
@@ -95,7 +97,8 @@ def sanity_checks(args):
         else:
             args.pretrained_weights = "Sentinel2_SwinB_MI_MS"
             # raise Exception("SWIN Backbone not Implemented with Multi Channel input")
-        
+    
+    if args.normalizing_type == 'percentile':    
         args.normalizing_factor = np.array([[1187.   , 1836.   ,  649.   ],
                                             [ 878.   , 1931.085, 1053.085],
                                             [ 749.   , 1982.51 , 1233.51 ],

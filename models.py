@@ -75,7 +75,7 @@ def setup_model(args):
         model = ModifiedUNET()
         
     elif args.model_type == 'swin':
-        if args.learned_upsample:
+        if args.learned_upsampling:
             #MODEL with learned upsampling
             weights_manager = satlaspretrain_models.Weights()
             fpn_model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True,)
