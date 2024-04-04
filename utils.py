@@ -38,6 +38,8 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-nt","--normalizing_type", default='percentile', help='Type of Normalization Used. Either "percentile" or "constant". If its is percentile, we use 1st and 99th percentile to perform linear scaling. Else a constant range is used.')
         parser.add_argument("-nf","--normalizing_factor", default=4000, type = int, help='Normalizing Factor for images')
         parser.add_argument("-lu", "--learned_upsampling",  action="store_true",  help = "Flag to train Deconvolution Layers on top of Swin Transformer")
+        parser.add_argument("-ena", "--exp_name", help = "Experiment Name for wanDB tracking")
+        parser.add_argument("-enu", "--exp_number",  default=1,  help = "Experiment Number with same setting for wanDB tracking")
         args = vars(parser.parse_args())
     
     else:       
@@ -65,6 +67,8 @@ def parse_arguments(cmd_flag=False):
         args['checkpoint']=None
         args['use_timepoints']=False
         args['learned_upsampling']=False
+        args['exp_name']="SWIN_MI"
+        args['exp_number']=1
     
     args = dotdict(args)
     args = sanity_checks(args)

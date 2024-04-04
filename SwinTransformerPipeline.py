@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 import pickle
+import wandb
 
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
@@ -23,7 +24,13 @@ from models import setup_model
 
 
 args = utils.parse_arguments(True)
-
+wandb.init(
+    # set the wandb project where this run will be logged
+    project= args.exp_name,
+    name = "run_"+str(args.exp_number),
+    # track hyperparameters and run metadata
+    config=args
+)
 
 if not os.path.isdir(args.model_dir):
     os.mkdir(args.model_dir)
@@ -151,6 +158,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         validation_ious.append(val_iou)
         
     print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,", Validation IOU - ", val_iou)
+    wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss, "Validation IoU":val_iou})
     
     if (e%10==0) or (val_loss < min_val_loss):
         torch.save(model.state_dict(), os.path.join(args.model_dir, f"{e+1}.pth"))
@@ -176,5 +184,7 @@ print("val_loss = ",validation_losses)
 print("val_iou = ", validation_ious)
 print("learning_rates = ", learning_rates)
 
+
+wandb.finish()
 
 
