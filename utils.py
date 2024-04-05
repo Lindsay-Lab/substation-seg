@@ -26,7 +26,7 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-lr", "--learning_rate", default = 1e-3, type = float, help = "Learning Rate")
         parser.add_argument("-s","--seed", default = 42, type = int, help="Seed for reproducibility")
         parser.add_argument("-r", "--resume_training",  action="store_true",  help = "Resume training from checkpoint")
-        parser.add_argument("-lkb", "--lookback", default = 10, type = int, help = "Number of epochs to wait before early stopping")
+        parser.add_argument("-lkb", "--lookback", default = 20, type = int, help = "Number of epochs to wait before early stopping")
         parser.add_argument("-se", "--starting_epoch", default = 0, type = int, help = "Epoch number for restarting training")
         parser.add_argument("-ui", "--upsampled_image_size", default = 256, type = int, help = "Size of Upsampled Image")
         parser.add_argument("-um", "--upsampled_mask_size", default = 256, type = int, help = "Size of Upsampled Mask")
@@ -77,18 +77,19 @@ def parse_arguments(cmd_flag=False):
 
 def sanity_checks(args):
     
-    if args.pretrained:
-        assert args.pretrained_weights is not None
     if args.resume_training:
         assert args.checkpoint is not None
         assert os.path.exists(args.checkpoint)
-    
+
+    #defining pretrained weights
     if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' :
         if args.pretrained:
             if args.in_channels == 3:
-                args.pretrained_weights = ResNet18_Weights.SENTINEL2_RGB_MOCO
+                args.pretrained_weights = ResNet50_Weights.SENTINEL2_RGB_MOCO
+            elif args.in_channels == 13:
+                args.pretrained_weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
             else:
-                args.pretrained_weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+                assert False 
         else:
             args.pretrained_weights = None
         
@@ -101,7 +102,8 @@ def sanity_checks(args):
         else:
             args.pretrained_weights = "Sentinel2_SwinB_MI_MS"
             # raise Exception("SWIN Backbone not Implemented with Multi Channel input")
-    
+
+            
     if args.normalizing_type == 'percentile':    
         args.normalizing_factor = np.array([[1187.   , 1836.   ,  649.   ],
                                             [ 878.   , 1931.085, 1053.085],
@@ -116,6 +118,9 @@ def sanity_checks(args):
                                             [  10.   ,   16.   ,    6.   ],
                                             [1053.   , 3444.68 , 2391.68 ],
                                             [ 501.   , 2715.   , 2214.   ]])
+    
+    if args.pretrained:
+        assert args.pretrained_weights is not None
     return args
     
     

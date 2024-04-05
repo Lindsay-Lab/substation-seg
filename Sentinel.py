@@ -1,6 +1,9 @@
 import os
 import random
 import numpy as np
+import pickle
+import wandb
+
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 import torch.nn as nn
@@ -10,42 +13,74 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
+from torchmetrics.classification import BinaryJaccardIndex
 from torchvision.ops import sigmoid_focal_loss
 import segmentation_models_pytorch as smp
-from torchgeo.models import ResNet50_Weights,ResNet50_Weights
-from torchmetrics.classification import BinaryJaccardIndex
+from torchgeo.models import ResNet50_Weights
+
 
 #our files
 import utils
 from dataloader import FullImageDataset
-import models
 from models import setup_model
 
 #Parameters
 args = utils.parse_arguments(True)
+wandb.init(
+    # set the wandb project where this run will be logged
+    project= args.exp_name,
+    name = "run_"+str(args.exp_number),
+    # track hyperparameters and run metadata
+    config=args
+)
+
 
 if not os.path.isdir(args.model_dir):
     os.mkdir(args.model_dir)
-utils.set_seed(args.seed)
+# utils.set_seed(seed)
+
+torch.manual_seed(args.seed)
+random.seed(args.seed)
 
 
 #DATALOADER
+geo_transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomRotation(degrees=15),
+#     transforms.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0)),
+    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
+])
+color_transform=None
+
 image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
 mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,transforms.InterpolationMode.NEAREST, antialias=True)])
 
-
 image_dir = os.path.join(args.data_dir, 'image_stack')
 mask_dir = os.path.join(args.data_dir, 'mask')
-image_filenames = os.listdir(image_dir)
+
+# for multi-image
+if args.use_timepoints:
+    with open("dataset/four_or_more_timepoints.pkl",'rb') as f:
+        image_filenames = pickle.load(f)
+else:
+    image_filenames = os.listdir(image_dir)
+    
 random.Random(args.seed).shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
-train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize)
-val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels, normalizing_factor=args.normalizing_factor, image_resize=image_resize, mask_resize=mask_resize)
+train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels,\
+                                 normalizing_factor=args.normalizing_factor, geo_transforms=geo_transform, \
+                                 color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize,\
+                                 mask_2d=False, use_timepoints=args.use_timepoints, model_type = args.model_type)
+val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels,\
+                               normalizing_factor=args.normalizing_factor, geo_transforms=None, color_transforms= None,\
+                               image_resize=image_resize, mask_resize=mask_resize, mask_2d=False, use_timepoints=args.use_timepoints,\
+                               model_type = args.model_type)
 
-train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers)
-val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers)
+train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
+val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)
 
 
 #MODEL
@@ -63,16 +98,17 @@ if args.loss == 'BCE':
 elif args.loss == 'DICE':
     criterion = smp.losses.DiceLoss(mode ='binary')
     
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 15, threshold=0.01, threshold_mode='rel', cooldown=10, min_lr=1e-7, eps=1e-08)
+optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 5, threshold=0.01, threshold_mode='rel', cooldown=5, min_lr=1e-7, eps=1e-08)
 iou_metric = BinaryJaccardIndex(0.5) 
-iou_metric = iou_metric.to(device)
+
 
 if torch.cuda.is_available():
     print("Using GPU")
     device = torch.device("cuda:0")
     model = model.to(device)
     criterion = criterion.to(device)
+    iou_metric = iou_metric.to(device)
 else:
     device = torch.device("cpu")
 
@@ -92,9 +128,10 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         optimizer.zero_grad()
         data, target = batch[0].to(device).float(), batch[1].to(device)
         output = model(data)
-        if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
-            output = downsample(output) 
-        if loss_type == 'FOCAL':
+        
+        # if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
+        #     output = downsample(output) 
+        if args.loss == 'FOCAL':
             loss = sigmoid_focal_loss(output, target, alpha = 0.75, reduction = 'mean')
         else:
             loss = criterion(output, target)
@@ -114,9 +151,9 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         for batch in val_dataloader:
             data, target = batch[0].to(device).float(), batch[1].to(device)
             output = model(data)
-            if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
-                output = downsample(output) 
-            if loss_type == 'FOCAL':
+            # if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
+            #     output = downsample(output) 
+            if args.loss == 'FOCAL':
                 loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
             else:
                 loss = criterion(output, target)
@@ -137,9 +174,10 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         validation_ious.append(val_iou)
         
     print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,", Validation IOU - ", val_iou)
+    wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss, "Validation IoU":val_iou})
     
     if (e%10==0) or (val_loss < min_val_loss):
-        torch.save(model.state_dict(), os.path.join(model_dir, f"{e+1}.pth"))
+        torch.save(model.state_dict(), os.path.join(args.model_dir, f"{e+1}.pth"))
     
     if val_loss < min_val_loss:
         min_val_loss = val_loss
@@ -151,13 +189,16 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
     scheduler.step(val_loss)
     learning_rates.append(scheduler.get_last_lr()[0])
     
-    if counter>=lookback:
+    if counter>=args.lookback:
         print("Early Stopping Reached")
         break
         
-torch.save(model.state_dict(), os.path.join(model_dir, "end.pth"))
+torch.save(model.state_dict(), os.path.join(args.model_dir, "end.pth"))
 
 print("train_loss = ",training_losses)
 print("val_loss = ",validation_losses)
 print("val_iou = ", validation_ious)
 print("learning_rates = ", learning_rates)
+
+
+wandb.finish()

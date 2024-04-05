@@ -43,19 +43,52 @@ class SwinWithUpSample(nn.Module):
             loss = self.loss_func(raw_outputs, target)
             loss = loss.mean()
         return outputs, loss
+
+class MiUnet(nn.Module):
+    def __init__(self, unet):
+        super(MiUnet,self).__init__()
+        self.encoder = unet.encoder
+        self.decoder = unet.decoder
+        self.segmentation_head = unet.segmentation_head
+        self.num_images_per_timepoint = 4  
         
-#kind='vanilla_unet', in_channels=3, pretrained=False, pretrained_weights=None, resume=False,checkpoint_path=None,  args=None
+    def forward(self, image):
+        bs, cxi, w, h = image.shape
+        image = torch.reshape(image, (bs, self.num_images_per_timepoint, -1, w,h))
+        bs, t, c, w, h = image.shape
+        image = torch.reshape(image, (-1,c,w,h))
+        
+        temp = self.encoder(image)
+        features = []
+        for i in range(len(temp)):
+            bsxi, c, w, h = temp[i].shape
+            x=torch.reshape(temp[i],(-1,self.num_images_per_timepoint,c, w, h)).permute(1,0,2,3,4) #4,bs,c,w,h
+            x = torch.maximum(torch.maximum(torch.maximum(x[0],x[1]),x[2]), x[3])
+            features.append(x)
+        decoder_output = self.decoder(*features)
+        masks = self.segmentation_head(decoder_output)
+        return masks        
+        
 def setup_model(args):
     
     if args.model_type == 'vanilla_unet':        
         model = smp.Unet(
-            encoder_name="resnet18",       
+            encoder_name="resnet50",       
             encoder_weights=None,     
             in_channels=args.in_channels,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=1,                      # model output channels (number of classes in your dataset)
         #     activation = 'sigmoid'     # because using sigmoid_focal_loss
         )
     
+    elif args.model_type == 'mi_unet':
+        unet = smp.Unet(
+            encoder_name="resnet50",       
+            encoder_weights=None,     
+            in_channels=args.in_channels,                  
+            classes=1,
+        )
+        model = MiUnet(unet)
+        
     elif args.model_type == 'modified_unet':
         
         class ModifiedUNET(nn.Module):
@@ -91,11 +124,13 @@ def setup_model(args):
         #assert pretrained_weights is not None
         if isinstance(args.pretrained_weights, WeightsEnum):
             state_dict = args.pretrained_weights.get_state_dict(progress=True)
-            if kind == 'modified_unet':
+            if args.model_type == 'modified_unet':
                 model.unet.encoder.load_state_dict(state_dict)
-            elif kind == 'vanilla_unet': 
+            elif args.model_type == 'vanilla_unet' or args.model_type == 'mi_unet': 
                 model.encoder.load_state_dict(state_dict)
-     
+            else:
+                raise Exception("Incorrect combination of weights and model")
+                
     if args.resume_training:
         #assert args.checkpoint is not None
         checkpoint = torch.load(args.checkpoint)
