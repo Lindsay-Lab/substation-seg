@@ -37,8 +37,8 @@ For Training SWIN model-
 ## Training Curves and Sample Outputs
 We train all models by minimizing Per-Pixel Binary Cross Entropy Loss and compute Intersection over Union(IoU) to test models. We achieve an impressive IoU score of 58% on test data using the SWIN Model. The loss and IoU curves are given below - 
 <p align="center" width="100%">
-  <img width="45%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/lossv_sepoch.png">
-  <img width="45%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/val_iou_vs_epoch (1).png">
+  <img width="40%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/lossv_sepoch.png">
+  <img width="40%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/val_iou_vs_epoch (1).png">
 </p>
 
 
