@@ -27,6 +27,6 @@ Sample image and mask pair are given below -
 
 ## Running Training Scripts
 For Training UNet- 
-```
-python3 Sentinel.py --model_dir <directory to save models> --batch_size <batch size for dataloader> --workers <number of parallel workers> --learning_rate 1e-3 --upsampled_mask_size <size of reshaped mask> --upsampled_image_size <size of reshaped image> --in_channels <set to 13 for using all channels or 3 for using RGB input> --seed <for reproducibility> --model_type <set vanilla_unet if not using multi temporal input else set to mi_unet> --normalizing_type constant --normalizing_factor 4000 --exp_name <for wandb logging> --exp_number <for wandb logging> --loss BCE [--pretrained] [--use_timepoints]"
-```
+
+> python3 Sentinel.py --model_dir <directory to save models> --batch_size <batch size for dataloader> --workers <number of parallel workers> --learning_rate 1e-3 --upsampled_mask_size <size of reshaped mask> --upsampled_image_size <size of reshaped image> --in_channels <set to 13 for using all channels or 3 for using RGB input> --seed <for reproducibility> --model_type <set vanilla_unet if not using multi temporal input else set to mi_unet> --normalizing_type constant --normalizing_factor 4000 --exp_name <for wandb logging> --exp_number <for wandb logging> --loss BCE [--pretrained] [--use_timepoints]"
+
