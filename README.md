@@ -11,6 +11,10 @@ The aim of this project is to build a computer vision model for segmenting subst
 - Sentinel.py
 - other training scripts
 
-
-dataset/image_stack and dataset/mask folders contain all the images and masks respectively. There are a a total of 26522 images-mask pairs stored as numpy files. Each image can contain multiple shots taken at the same place during different revisits. Majority of the files contains images from 5 revisits. Each image contains 13 channels and has a dimention of 228*228.
+Dataset Details
+- dataset/image_stack and dataset/mask folders contain all the images and masks respectively.
+- There are a a total of 26522 images-mask pairs stored as numpy files.
+- Each image is multi-temporal and contains multiple shots taken at the same place during different revisits. Majority of the files contains images from 5 revisits.
+- Each image is multi-spectral and  contains 13 channels
+- Spatial Resolution of each image is 228*228.
 
