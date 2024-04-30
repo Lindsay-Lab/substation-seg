@@ -67,3 +67,7 @@ Seattle, Washington: Association for Computing Machinery, Nov. 2022, pp. 1–12.
 10.1145/3557915.3560953. url: https://dl.acm.org/doi/10.1145/3557915.3560953.
 * Piper Wolters, Favyen Bastani, and Aniruddha Kembhavi. Zooming Out on Zooming In:
 Advancing Super-Resolution for Remote Sensing. 2023. arXiv:2311.18082 [cs.CV].
+
+
+## Contact
+For questions and queries please reach out to Kartik Jindgar <kartik.jindgar@nyu.edu> and Grace Lindsay <grace.lindsay@nyu.edu>
