@@ -45,6 +45,6 @@ We train all models by minimizing Per-Pixel Binary Cross Entropy Loss and comput
 Sample output from our best models is provided below - 
 
 <p align="center" width="100%">
-  <img width="33%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output.png">
-  <img width="33%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output (1).png">
+  <img width="50%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output.png">
+  <img width="50%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output (1).png">
 </p>
