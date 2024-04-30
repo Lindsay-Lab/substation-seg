@@ -63,7 +63,8 @@ class MiUnet(nn.Module):
         for i in range(len(temp)):
             bsxi, c, w, h = temp[i].shape
             x=torch.reshape(temp[i],(-1,self.num_images_per_timepoint,c, w, h)).permute(1,0,2,3,4) #4,bs,c,w,h
-            x = torch.maximum(torch.maximum(torch.maximum(x[0],x[1]),x[2]), x[3])
+            # x = torch.amax(x, 0) #or use this -> x = torch.maximum(torch.maximum(torch.maximum(x[0],x[1]),x[2]), x[3])
+            x = torch.mean(x, 0) #average pooling of multiple timepoints
             features.append(x)
         decoder_output = self.decoder(*features)
         masks = self.segmentation_head(decoder_output)

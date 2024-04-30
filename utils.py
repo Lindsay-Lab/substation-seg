@@ -82,7 +82,7 @@ def sanity_checks(args):
         assert os.path.exists(args.checkpoint)
 
     #defining pretrained weights
-    if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' :
+    if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' or args.model_type == 'mi_unet':
         if args.pretrained:
             if args.in_channels == 3:
                 args.pretrained_weights = ResNet50_Weights.SENTINEL2_RGB_MOCO
