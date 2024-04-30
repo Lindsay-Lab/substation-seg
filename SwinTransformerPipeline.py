@@ -118,7 +118,7 @@ min_val_loss = np.inf
 counter = 0
 
 for e in range(args.starting_epoch,args.starting_epoch+args.epochs):    
-    #Training
+    #Training Loop
     train_loss=0
     model.train()
     

@@ -84,14 +84,8 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffl
 
 
 #MODEL
-
 # weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
 model = setup_model(args)
-
-#FREEZE MODEL
-# for name, param in model.named_parameters():
-#     if name.split('.')[0]=='encoder':
-#         param.requires_grad=False
 
 if args.loss == 'BCE':
     criterion = nn.BCEWithLogitsLoss()
@@ -121,7 +115,7 @@ min_val_loss = np.inf
 counter = 0
 
 for e in range(args.starting_epoch,args.starting_epoch+args.epochs):    
-    #Training
+    #Training Loop
     train_loss=0
     model.train();
     for i , batch in enumerate(train_dataloader):
