@@ -35,8 +35,16 @@ For Training SWIN model-
 > python3 SwinTransformerPipeline.py --model_dir <directory to save models> --batch_size <batch size for dataloader> --workers <number of parallel workers> --learning_rate 5e-4 --upsampled_mask_size <size of reshaped mask> --upsampled_image_size <size of reshaped image> --in_channels <set to 13 for using all channels or 3 for using RGB input> --seed <for reproducibility> --model_type swin --normalizing_type constant --normalizing_factor 4000 --exp_name <for wandb logging> --exp_number <for wandb logging> --loss BCE --pretrained [add this to use pretrained encoder] --use_timepoints [add this to enable multi-temporal input] --learned_upsampling [to append learnable Up-Conv layers at the end of FPN network to upsample Output Mask to Input Image size]
 
 ## Training Curves and Sample Outputs
-We compute Intersection over Union(IoU) to test models. We achieve an impressive IoU score of 58% on test data using the SWIN Model. The loss and IoU curves are given below - 
+We train all models by minimizing Per-Pixel Binary Cross Entropy Loss and compute Intersection over Union(IoU) to test models. We achieve an impressive IoU score of 58% on test data using the SWIN Model. The loss and IoU curves are given below - 
 <p align="center" width="100%">
   <img width="33%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/lossv_sepoch.png">
   <img width="33%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/val_iou_vs_epoch (1).png">
+</p>
+
+
+Sample output from our best models is provided below - 
+
+<p align="center" width="100%">
+  <img width="33%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output.png">
+  <img width="33%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output (1).png">
 </p>
