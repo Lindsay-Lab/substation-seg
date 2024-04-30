@@ -17,8 +17,10 @@ The aim of this project is to build a computer vision model for segmenting subst
 - Each image is multi-temporal and contains multiple shots taken at the same place during different revisits. Majority of the files contains images from 5 revisits.
 - Each image is multi-spectral and  contains 13 channels
 - Spatial Resolution of each image is 228*228.
+
+  
 Sample image and mask pair are given below -
-
-<img width="640px" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_input.png">
-
+<p align="center" width="100%">
+  <img width="640px" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_input.png">
+</p>
 
