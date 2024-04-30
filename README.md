@@ -19,4 +19,6 @@ The aim of this project is to build a computer vision model for segmenting subst
 - Spatial Resolution of each image is 228*228.
 Sample image and mask pair are given below -
 
+[<img src="artifacts/example-input.png">]
+
 
