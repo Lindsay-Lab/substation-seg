@@ -48,3 +48,22 @@ Sample outputs from our best models is provided below -
   <img width="75%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output.png">
   <img width="75%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output (1).png">
 </p>
+
+
+## References
+* Copernicus Sentinel data [2023]. https://scihub.copernicus.eu/
+* Open Street Map. https://www.openstreetmap.org/copyright
+* Transition Zero. https://www.transitionzero.org/
+* Ze Liu et al. Swin Transformer: Hierarchical Vision Transformer using Shifted Windows. 2021.
+arXiv: 2103.14030 [cs.CV].
+* Muhammed Razzak et al. Multi-Spectral Multi-Image Super-Resolution of Sentinel-2 with
+Radiometric Consistency Losses and Its Effect on Building Delineation. 2021. arXiv: 2111.03231
+[eess.IV].
+* Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-Net: Convolutional Networks for
+Biomedical Image Segmentation. 2015. arXiv: 1505. 04597 [cs.CV].
+* Adam J. Stewart et al. “TorchGeo: Deep Learning With Geospatial Data”. In: Proceedings of the
+30th International Conference on Advances in Geographic Information Systems. SIGSPATIAL ’22.
+Seattle, Washington: Association for Computing Machinery, Nov. 2022, pp. 1–12. doi:
+10.1145/3557915.3560953. url: https://dl.acm.org/doi/10.1145/3557915.3560953.
+* Piper Wolters, Favyen Bastani, and Aniruddha Kembhavi. Zooming Out on Zooming In:
+Advancing Super-Resolution for Remote Sensing. 2023. arXiv:2311.18082 [cs.CV].
