@@ -4,6 +4,7 @@ from torch import nn
 import torch 
 import satlaspretrain_models
 
+
 class SwinWithUpSample(nn.Module):
     def __init__(self, fpn_model):
         super(SwinWithUpSample, self).__init__()
@@ -69,9 +70,20 @@ class MiUnet(nn.Module):
         decoder_output = self.decoder(*features)
         masks = self.segmentation_head(decoder_output)
         return masks        
-        
+
+def update_layers(model):
+    children = list(model.children())
+    if len(children)==0:
+        if isinstance(model, (torch.nn.Linear, torch.nn.Conv2d)):
+            torch.nn.init.xavier_uniform_(model.weight.data)
+    else:
+        for c in children:
+            update_layers(c)
+            
+            
 def setup_model(args):
     
+    #Setting Up Model
     if args.model_type == 'vanilla_unet':        
         model = smp.Unet(
             encoder_name="resnet50",       
@@ -121,6 +133,7 @@ def setup_model(args):
     else:
         raise Exception("Incorrect Model Selected")
     
+    #Loading Pretrained Weights
     if args.pretrained: 
         #assert pretrained_weights is not None
         if isinstance(args.pretrained_weights, WeightsEnum):
@@ -131,7 +144,12 @@ def setup_model(args):
                 model.encoder.load_state_dict(state_dict)
             else:
                 raise Exception("Incorrect combination of weights and model")
-                
+    else:
+        if args.model_type =='swin':
+            #Randomly initializing weights for SWIN model
+            update_layers(model)
+    
+    #Loading checkpoints            
     if args.resume_training:
         #assert args.checkpoint is not None
         checkpoint = torch.load(args.checkpoint)
