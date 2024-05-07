@@ -48,7 +48,11 @@ geo_transform = transforms.Compose([
 #     transforms.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0)),
     transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
 ])
-color_transform=None
+
+color_transform=color_transform = transforms.Compose([
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+    ])
+
 # if args.in_channels==3:
 #     color_transform = transforms.Compose([
 #         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
