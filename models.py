@@ -3,7 +3,8 @@ from torchvision.models._api import WeightsEnum
 from torch import nn
 import torch 
 import satlaspretrain_models
-
+import torchgeo
+import timm
 
 class SwinWithUpSample(nn.Module):
     def __init__(self, fpn_model):
@@ -71,6 +72,78 @@ class MiUnet(nn.Module):
         masks = self.segmentation_head(decoder_output)
         return masks        
 
+class ViT(nn.Module):
+    def __init__(self,encoder, embedding_dim=384, use_timepoints=False):
+        super().__init__()
+        self.encoder = encoder
+        self.embedding_dim = embedding_dim
+        self.output_embed_dim = 1
+        self.use_timepoints = use_timepoints
+        self.num_timepoints = 4
+        num_convs=4
+        num_convs_per_upscale=1
+        
+        self.channels = [self.embedding_dim // (2 ** i) for i in range(num_convs)]
+        self.channels = [self.embedding_dim] + self.channels
+
+        
+        def _build_upscale_block(channels_in, channels_out):
+            
+            conv_kernel_size = 3
+            conv_padding = 1
+            kernel_size = 2
+            stride = 2
+            dilation = 1
+            padding = 0
+            output_padding = 0
+            
+            layers = []
+            layers.append(nn.ConvTranspose2d(
+                channels_in,
+                channels_out,
+                kernel_size=kernel_size,
+                stride=stride,
+                dilation=dilation,
+                padding=padding,
+                output_padding=output_padding,
+            ))
+
+            layers += [nn.Sequential(
+                      nn.Conv2d(channels_out,
+                      channels_out,
+                      kernel_size=conv_kernel_size,
+                      padding=conv_padding),
+                      nn.BatchNorm2d(channels_out),
+                      nn.Dropout(),
+                      nn.ReLU()) for _ in range(num_convs_per_upscale)]
+
+            return nn.Sequential(*layers)
+
+        self.layers = nn.ModuleList([
+            _build_upscale_block(self.channels[i], self.channels[i+1])
+            for i in range(len(self.channels) - 1)
+        ])
+
+        self.conv = nn.Conv2d(self.channels[-1], self.output_embed_dim, kernel_size = 3, padding=1)
+
+    def forward(self, image):
+        bs, cxt, h, w = image.shape
+        if self.use_timepoints:
+            image = image.reshape(bs, self.num_timepoints, -1, h, w)
+            b, t, c, h, w = image.shape
+            image = image.reshape(-1, c, h, w)
+            
+        feature = self.encoder.forward_features(image)
+        if self.use_timepoints:
+            temporal_features = feature.reshape(-1, self.num_timepoints, feature.shape[1], feature.shape[2]).permute(1,0,2,3)
+            feature = torch.amax(temporal_features, dim = 0)
+        feature = feature[:,1:,:].view(-1,14,14,self.embedding_dim).permute(0,3,1,2)
+        for layer in self.layers:
+            feature = layer(feature)
+        pred = self.conv(feature)
+        return pred
+        
+        
 def update_layers(model):
     children = list(model.children())
     if len(children)==0:
@@ -129,7 +202,15 @@ def setup_model(args):
         else:
             weights_manager = satlaspretrain_models.Weights()
             model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
-
+    
+    elif args.model_type == 'vit_torchgeo':
+        vit_encoder = torchgeo.models.vit_small_patch16_224(args.pretrained_weights)
+        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints)
+        
+    elif args.model_type == 'vit_imagenet':
+        vit_encoder = timm.create_model(args.pretrained_weights, pretrained = args.pretrained)
+        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints)
+        
     else:
         raise Exception("Incorrect Model Selected")
     

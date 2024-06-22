@@ -3,8 +3,7 @@ import numpy as np
 import torch
 import random
 import os
-from torchgeo.models import ResNet18_Weights,ResNet50_Weights
-
+from torchgeo.models import ResNet18_Weights,ResNet50_Weights, ViTSmall16_Weights
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -40,6 +39,9 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-lu", "--learned_upsampling",  action="store_true",  help = "Flag to train Deconvolution Layers on top of Swin Transformer")
         parser.add_argument("-ena", "--exp_name", help = "Experiment Name for wanDB tracking")
         parser.add_argument("-enu", "--exp_number",  default=1,  help = "Experiment Number with same setting for wanDB tracking")
+        
+        parser.add_argument("-vs","--vit_size", default = 'vit_base', help='vit architecture')
+        parser.add_argument("-vp","--vit_pretraining", action = 'store_true', help='pretrained vit or not')
         args = vars(parser.parse_args())
     
     else:       
@@ -77,10 +79,6 @@ def parse_arguments(cmd_flag=False):
 
 def sanity_checks(args):
     
-    if args.resume_training:
-        assert args.checkpoint is not None
-        assert os.path.exists(args.checkpoint)
-
     #defining pretrained weights
     if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' or args.model_type == 'mi_unet':
         if args.pretrained:
@@ -94,7 +92,7 @@ def sanity_checks(args):
             args.pretrained_weights = None
         
     elif args.model_type=='swin':
-        if args.in_channels ==3:    
+        if args.in_channels == 3:    
             if args.use_timepoints:
                 args.pretrained_weights = "Sentinel2_SwinB_MI_RGB"
             else:
@@ -102,7 +100,21 @@ def sanity_checks(args):
         else:
             args.pretrained_weights = "Sentinel2_SwinB_MI_MS"
             # raise Exception("SWIN Backbone not Implemented with Multi Channel input")
-
+    
+    elif args.model_type == 'vit_torchgeo':
+        args.pretrained_weights = ViTSmall16_Weights.SENTINEL2_ALL_DINO
+        args.embedding_size = 384
+    
+    elif args.model_type == 'vit_imagenet':
+        if args.vit_size=='small':
+            args.pretrained_weights='vit_small_patch16_224'
+            args.embedding_size = 384
+        elif args.vit_size == 'base':
+            args.pretrained_weights= 'vit_base_patch16_224'
+            args.embedding_size = 768
+        elif args.vit_size == 'large':
+            args.pretrained_weights= 'vit_large_patch16_224'
+            args.embedding_size = 1024
             
     if args.normalizing_type == 'percentile':    
         args.normalizing_factor = np.array([[1187.   , 1836.   ,  649.   ],
@@ -121,6 +133,25 @@ def sanity_checks(args):
     
     if args.pretrained:
         assert args.pretrained_weights is not None
+    
+    if args.resume_training:
+        assert args.checkpoint is not None
+        assert os.path.exists(args.checkpoint)
+    
+    if args.model_type=='swin':
+        if args.in_channels!=3:
+            if args.in_channels !=9:
+                raise Warning("Swin Model can take only 9 channles for MS input. Setting input channels to 9.")
+                args.in_channels = 9
+    elif args.model_type == 'vit_imagenet':
+        if args.in_channels != 3:
+            raise Warning("Vit Imagenet Model can take only 3 channles. Setting input channels to 3.")
+            args.in_channels = 3
+    elif args.model_type == 'vit_torchgeo':
+        if args.in_channels != 13:
+            raise Warning("Vit Torchgeo Model can take only 13 channles. Setting input channels to 13.")
+            args.in_channels = 13
+
     return args
     
     
