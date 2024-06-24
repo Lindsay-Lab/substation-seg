@@ -211,6 +211,7 @@ class FullImageDataset(torch.utils.data.Dataset):
         self.image_dir = os.path.join(args.data_dir, 'image_stack')
         self.mask_dir = os.path.join(args.data_dir, 'mask')
         self.image_filenames = image_files
+        self.args = args
         
     def __getitem__(self, index):
         image_filename = self.image_filenames[index]
@@ -224,9 +225,9 @@ class FullImageDataset(torch.utils.data.Dataset):
         if self.normalizing_type=='percentile':
             image = (image- self.normalizing_factor[:,0].reshape((-1,1,1)))/self.normalizing_factor[:,2].reshape((-1,1,1))
         elif self.normalizing_type == 'zscore':
-            means = np.array([1431, 1233, 1209, 1192, 1448, 2238, 2609, 2537, 2828, 884, 20, 2226, 1537]).reshape(-1, 1, 1)
-            stds = np.array([157, 254, 290, 420, 363, 457, 575, 606, 630, 156, 3, 554, 523]).reshape(-1, 1, 1)
-            image = (image-means)/stds
+            # means = np.array([1431, 1233, 1209, 1192, 1448, 2238, 2609, 2537, 2828, 884, 20, 2226, 1537]).reshape(-1, 1, 1)
+            # stds = np.array([157, 254, 290, 420, 363, 457, 575, 606, 630, 156, 3, 554, 523]).reshape(-1, 1, 1)
+            image = (image-self.args.means)/self.args.stds
         else:
             image = image/self.normalizing_factor  
             #clipping image to 0,1 range
