@@ -195,17 +195,18 @@ class FullImageDataset(torch.utils.data.Dataset):
     image,mask -> ((in_channels,64,64),(1,64,64))
     '''
         
-    def __init__(self, data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None, use_timepoints=False, normalizing_factor = 5000, mask_2d=False, model_type ='swin'):
-        self.data_dir = data_dir
+    def __init__(self, args, image_files, geo_transforms=None, color_transforms= None, image_resize = None, mask_resize = None,):
+        self.data_dir = args.data_dir
         self.geo_transforms = geo_transforms
         self.color_transforms = color_transforms
         self.image_resize = image_resize
         self.mask_resize = mask_resize
-        self.in_channels=in_channels
-        self.use_timepoints = use_timepoints 
-        self.normalizing_factor = normalizing_factor
-        self.mask_2d = mask_2d
-        self.model_type = model_type
+        self.in_channels = args.in_channels
+        self.use_timepoints = args.use_timepoints 
+        self.normalizing_type = args.normalizing_type
+        self.normalizing_factor = args.normalizing_factor
+        self.mask_2d = args.mask_2d
+        self.model_type = args.model_type
         
         self.image_dir = os.path.join(data_dir, 'image_stack')
         self.mask_dir = os.path.join(data_dir, 'mask')
@@ -220,10 +221,16 @@ class FullImageDataset(torch.utils.data.Dataset):
         image = np.load(image_path)['arr_0'] # t x 13 x h x w 
         
         #standardizing image
-        if type(self.normalizing_factor) == np.ndarray:
+        if self.normalizing_type=='percentile':
             image = (image- self.normalizing_factor[:,0].reshape((-1,1,1)))/self.normalizing_factor[:,2].reshape((-1,1,1))
+        elif self.normalizing_type == 'zscore':
+            means = np.array([1431, 1233, 1209, 1192, 1448, 2238, 2609, 2537, 2828, 884, 20, 2226, 1537]).reshape(-1, 1, 1)
+            stds = np.array([157, 254, 290, 420, 363, 457, 575, 606, 630, 156, 3, 554, 523]).reshape(-1, 1, 1)
+            image = (image-means)/stds
         else:
-            image = image/self.normalizing_factor     
+            image = image/self.normalizing_factor  
+            #clipping image to 0,1 range
+            image = np.clip(image, 0,1)
         
         #selecting channels
         if self.in_channels==3:
@@ -266,17 +273,12 @@ class FullImageDataset(torch.utils.data.Dataset):
                     image[i*self.in_channels:i*self.in_channels+3,:,:] = self.color_transforms(image[i*self.in_channels:i*self.in_channels+3,:,:])    
                 else:
                     raise Exception("Can't apply color transformation. Make sure the correct input dimenions are used")
-
-            # image = self.color_transforms(image)
-        
+       
         if self.image_resize:
             image = self.image_resize(image)
         
         if self.mask_resize:
             mask = self.mask_resize(mask)
-        
-        #clipping image to 0,1 range
-        image = torch.clip(image, 0,1)
             
         return image, mask
 

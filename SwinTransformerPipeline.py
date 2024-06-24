@@ -14,12 +14,10 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from torchmetrics.classification import BinaryJaccardIndex
-# import satlaspretrain_models
 
 #our files
 import utils
 from dataloader import FullImageDataset
-
 from models import setup_model
 
 
@@ -50,15 +48,8 @@ geo_transform = transforms.Compose([
 ])
 
 color_transform=color_transform = transforms.Compose([
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+        transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
     ])
-
-# if args.in_channels==3:
-#     color_transform = transforms.Compose([
-#         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-#     ])
-# else:
-#     color_transform=None
 
 image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
 mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,transforms.InterpolationMode.NEAREST, antialias=True)])
@@ -81,14 +72,16 @@ random.Random(args.seed).shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
-# data_dir, image_files, in_channels=3, geo_transforms=None, color_transforms= None, use_timepoints=False, normalizing_factor = 5000
-train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels,\
-                                 normalizing_factor=args.normalizing_factor, geo_transforms=geo_transform, \
-                                 color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize,\
-                                 mask_2d=True, use_timepoints=args.use_timepoints, model_type = args.model_type)
-val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels,\
-                               normalizing_factor=args.normalizing_factor, geo_transforms=None, color_transforms= None,\
-                               image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints, model_type = args.model_type)
+
+# train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels,\
+#                                  normalizing_factor=args.normalizing_factor, geo_transforms=geo_transform, \
+#                                  color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize,\
+#                                  mask_2d=True, use_timepoints=args.use_timepoints, model_type = args.model_type)
+# val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels,\
+#                               normalizing_factor=args.normalizing_factor, geo_transforms=None, color_transforms= None,\
+#                               image_resize=image_resize, mask_resize=mask_resize, mask_2d=True, use_timepoints=args.use_timepoints, model_type = args.model_type)
+train_dataset = FullImageDataset(args, image_files=train_set, geo_transforms=geo_transform, color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize)
+val_dataset = FullImageDataset(args, image_files=val_set, image_resize=image_resize, mask_resize=mask_resize,)
 
 train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
 val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)

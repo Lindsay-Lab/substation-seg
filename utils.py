@@ -18,6 +18,7 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-d","--data_dir", default = "/scratch/kj1447/gracelab/dataset", help="Data Directory")
         parser.add_argument("-m","--model_dir", help="Model Directory for Saving Checkpoints. A folder with this name would be created within the models folder")
         parser.add_argument("-l","--loss", default = "BCE", help="Can take following values - BCE, FOCAL or DICE")
+        parser.add_argument("-a","--alpha", default = 0.25, type = float, help="Alpha Parameter for FOCAL Loss")
         parser.add_argument("-e","--epochs", default = 250, type = int, help="Number of epochs")
         parser.add_argument("-bs","--batch_size", default = 32, type=int, help="Batch Size")
         parser.add_argument("-w","--workers", default = 16, type=int, help="Number of Workers")
@@ -41,7 +42,6 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-enu", "--exp_number",  default=1,  help = "Experiment Number with same setting for wanDB tracking")
         
         parser.add_argument("-vs","--vit_size", default = 'vit_base', help='vit architecture')
-        parser.add_argument("-vp","--vit_pretraining", action = 'store_true', help='pretrained vit or not')
         args = vars(parser.parse_args())
     
     else:       
@@ -50,6 +50,7 @@ def parse_arguments(cmd_flag=False):
         args['data_dir']= "/scratch/kj1447/gracelab/dataset"
         args['model_dir'] = '/scratch/kj1447/gracelab/models/SWIN_FPN_low_LR'
         args['loss'] = "BCE"
+        args['alpha'] = 0.25
         args['epochs'] = 250
         args['batch_size'] = 16
         args['workers'] = 16
@@ -71,6 +72,7 @@ def parse_arguments(cmd_flag=False):
         args['learned_upsampling']=True
         args['exp_name']="SWIN_MI"
         args['exp_number']=1
+        args['vit_size'] ='vit_base'
     
     args = dotdict(args)
     args = sanity_checks(args)
@@ -79,7 +81,7 @@ def parse_arguments(cmd_flag=False):
 
 def sanity_checks(args):
     
-    #defining pretrained weights
+    #Defining Pretrained Weights
     if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' or args.model_type == 'mi_unet':
         if args.pretrained:
             if args.in_channels == 3:
@@ -115,7 +117,15 @@ def sanity_checks(args):
         elif args.vit_size == 'large':
             args.pretrained_weights= 'vit_large_patch16_224'
             args.embedding_size = 1024
-            
+    
+    if args.pretrained:
+        assert args.pretrained_weights is not None
+        
+    if args.resume_training:
+        assert args.checkpoint is not None
+        assert os.path.exists(args.checkpoint)
+        
+    # Normalizing Schemes        
     if args.normalizing_type == 'percentile':    
         args.normalizing_factor = np.array([[1187.   , 1836.   ,  649.   ],
                                             [ 878.   , 1931.085, 1053.085],
@@ -131,13 +141,8 @@ def sanity_checks(args):
                                             [1053.   , 3444.68 , 2391.68 ],
                                             [ 501.   , 2715.   , 2214.   ]])
     
-    if args.pretrained:
-        assert args.pretrained_weights is not None
     
-    if args.resume_training:
-        assert args.checkpoint is not None
-        assert os.path.exists(args.checkpoint)
-    
+    # Input Channel Checks
     if args.model_type=='swin':
         if args.in_channels!=3:
             if args.in_channels !=9:
@@ -152,6 +157,11 @@ def sanity_checks(args):
             raise Warning("Vit Torchgeo Model can take only 13 channles. Setting input channels to 13.")
             args.in_channels = 13
 
+    if args.model_type =='swin':
+        args.mask_2d=True
+    else:
+        args.mask_2d=False
+        
     return args
     
     

@@ -5,6 +5,8 @@ import torch
 import satlaspretrain_models
 import torchgeo
 import timm
+import segmentation_models_pytorch as smp
+from torchvision.ops import sigmoid_focal_loss
 
 class SwinWithUpSample(nn.Module):
     def __init__(self, fpn_model):
@@ -47,14 +49,16 @@ class SwinWithUpSample(nn.Module):
         return outputs, loss
 
 class MiUnet(nn.Module):
-    def __init__(self, unet):
+    def __init__(self, unet, loss_fn, args):
         super(MiUnet,self).__init__()
         self.encoder = unet.encoder
         self.decoder = unet.decoder
         self.segmentation_head = unet.segmentation_head
         self.num_images_per_timepoint = 4  
+        self.loss_fn = loss_fn
+        self.args = args
         
-    def forward(self, image):
+    def forward(self, image, target):
         bs, cxi, w, h = image.shape
         image = torch.reshape(image, (bs, self.num_images_per_timepoint, -1, w,h))
         bs, t, c, w, h = image.shape
@@ -69,11 +73,17 @@ class MiUnet(nn.Module):
             x = torch.mean(x, 0) #average pooling of multiple timepoints
             features.append(x)
         decoder_output = self.decoder(*features)
-        masks = self.segmentation_head(decoder_output)
-        return masks        
+        raw_outputs = self.segmentation_head(decoder_output)
+        if args.loss == 'FOCAL':
+            loss = loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        else :
+            loss = loss_fn(raw_outputs, target)
+        
+        outputs = torch.nn.functional.sigmoid(raw_outputs)
+        return outputs, loss        
 
 class ViT(nn.Module):
-    def __init__(self,encoder, embedding_dim=384, use_timepoints=False):
+    def __init__(self,encoder, embedding_dim=384, use_timepoints=False, loss_fn, args):
         super().__init__()
         self.encoder = encoder
         self.embedding_dim = embedding_dim
@@ -82,6 +92,8 @@ class ViT(nn.Module):
         self.num_timepoints = 4
         num_convs=4
         num_convs_per_upscale=1
+        self.loss_fn = loss_fn
+        self.args = args
         
         self.channels = [self.embedding_dim // (2 ** i) for i in range(num_convs)]
         self.channels = [self.embedding_dim] + self.channels
@@ -126,7 +138,7 @@ class ViT(nn.Module):
 
         self.conv = nn.Conv2d(self.channels[-1], self.output_embed_dim, kernel_size = 3, padding=1)
 
-    def forward(self, image):
+    def forward(self, image, target):
         bs, cxt, h, w = image.shape
         if self.use_timepoints:
             image = image.reshape(bs, self.num_timepoints, -1, h, w)
@@ -140,9 +152,15 @@ class ViT(nn.Module):
         feature = feature[:,1:,:].view(-1,14,14,self.embedding_dim).permute(0,3,1,2)
         for layer in self.layers:
             feature = layer(feature)
-        pred = self.conv(feature)
-        return pred
+        raw_outputs = self.conv(feature)
         
+        if args.loss == 'FOCAL':
+            loss = loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        else :
+            loss = loss_fn(raw_outputs, target)
+            
+        outputs = torch.nn.functional.sigmoid(raw_outputs)
+        return outputs, loss
         
 def update_layers(model):
     children = list(model.children())
@@ -153,9 +171,28 @@ def update_layers(model):
         for c in children:
             update_layers(c)
             
+def setup_loss_func(args):
+        if args.model_type != 'swin' :
+            if args.loss == 'BCE':
+                criterion = nn.BCEWithLogitsLoss()
+                loss_fn = lambda output, target : criterion(output, target)
+                
+            elif args.loss == 'DICE':
+                criterion = smp.losses.DiceLoss(mode ='binary')
+                loss_fn = lambda output, target : criterion(output, target)
+            
+            elif args.loss == 'FOCAL':
+                loss_fn = sigmoid_focal_loss
+        else:
+            loss_fn = None
+        return loss_fn
+
             
 def setup_model(args):
     
+    loss_fn = setup_loss_func(args)
+    
+            
     #Setting Up Model
     if args.model_type == 'vanilla_unet':        
         model = smp.Unet(
@@ -173,7 +210,7 @@ def setup_model(args):
             in_channels=args.in_channels,                  
             classes=1,
         )
-        model = MiUnet(unet)
+        model = MiUnet(unet, loss_fn, args)
         
     elif args.model_type == 'modified_unet':
         
@@ -205,11 +242,11 @@ def setup_model(args):
     
     elif args.model_type == 'vit_torchgeo':
         vit_encoder = torchgeo.models.vit_small_patch16_224(args.pretrained_weights)
-        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints)
+        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints, loss_fn, args)
         
     elif args.model_type == 'vit_imagenet':
         vit_encoder = timm.create_model(args.pretrained_weights, pretrained = args.pretrained)
-        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints)
+        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints, loss_fn, args)
         
     else:
         raise Exception("Incorrect Model Selected")

@@ -14,10 +14,8 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from torchmetrics.classification import BinaryJaccardIndex
-from torchvision.ops import sigmoid_focal_loss
-import segmentation_models_pytorch as smp
-from torchgeo.models import ResNet50_Weights
-
+# from torchvision.ops import sigmoid_focal_loss
+# import segmentation_models_pytorch as smp
 
 #our files
 import utils
@@ -51,6 +49,9 @@ geo_transform = transforms.Compose([
 #     transforms.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0)),
     transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
 ])
+# color_transform=color_transform = transforms.Compose([
+#         transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+#     ])
 color_transform=None
 
 image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
@@ -70,28 +71,16 @@ random.Random(args.seed).shuffle(image_filenames)
 train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
 val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
 
-train_dataset = FullImageDataset(data_dir = args.data_dir, image_files=train_set, in_channels = args.in_channels,\
-                                 normalizing_factor=args.normalizing_factor, geo_transforms=geo_transform, \
-                                 color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize,\
-                                 mask_2d=False, use_timepoints=args.use_timepoints, model_type = args.model_type)
-val_dataset = FullImageDataset(data_dir = args.data_dir, image_files=val_set, in_channels = args.in_channels,\
-                               normalizing_factor=args.normalizing_factor, geo_transforms=None, color_transforms= None,\
-                               image_resize=image_resize, mask_resize=mask_resize, mask_2d=False, use_timepoints=args.use_timepoints,\
-                               model_type = args.model_type)
+train_dataset = FullImageDataset(args, image_files=train_set, geo_transforms=geo_transform, color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize)
+val_dataset = FullImageDataset(args, image_files=val_set, image_resize=image_resize, mask_resize=mask_resize,)
 
 train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
 val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)
 
 
 #MODEL
-# weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
 model = setup_model(args)
 
-if args.loss == 'BCE':
-    criterion = nn.BCEWithLogitsLoss()
-elif args.loss == 'DICE':
-    criterion = smp.losses.DiceLoss(mode ='binary')
-    
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 5, threshold=0.01, threshold_mode='rel', cooldown=5, min_lr=1e-7, eps=1e-08)
 iou_metric = BinaryJaccardIndex(0.5) 
@@ -101,7 +90,6 @@ if torch.cuda.is_available():
     print("Using GPU")
     device = torch.device("cuda:0")
     model = model.to(device)
-    criterion = criterion.to(device)
     iou_metric = iou_metric.to(device)
 else:
     device = torch.device("cpu")
@@ -121,14 +109,8 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
     for i , batch in enumerate(train_dataloader):
         optimizer.zero_grad()
         data, target = batch[0].to(device).float(), batch[1].to(device)
-        output = model(data)
-        
-        # if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
-        #     output = downsample(output) 
-        if args.loss == 'FOCAL':
-            loss = sigmoid_focal_loss(output, target, alpha = 0.75, reduction = 'mean')
-        else:
-            loss = criterion(output, target)
+        output, loss = model(data, target)
+
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
@@ -144,20 +126,16 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         val_iou = 0.0
         for batch in val_dataloader:
             data, target = batch[0].to(device).float(), batch[1].to(device)
-            output = model(data)
-            # if (upsampled_mask_size<upsampled_image_size) and (kind =='vanilla_unet'):
-            #     output = downsample(output) 
-            if args.loss == 'FOCAL':
-                loss = sigmoid_focal_loss(output, target, alpha = 0.25, reduction = 'mean')
+            output,loss = model(data, target)
+
+            if args.model_type=='swin':
+                pred_mask = torch.argmax(output, dim=1)
+                iou = iou_metric(pred_mask, torch.argmax(target, dim = 1))
             else:
-                loss = criterion(output, target)
-            output = torch.sigmoid(output)
-            pred_mask = (output > 0.5).float()
-            
-            iou = iou_metric(output, target)
+                pred_mask = (output > 0.5).float()
+                iou = iou_metric(pred_mask, target)
             val_iou+=iou.item()
             val_loss += loss.item()
- 
         val_iou = val_iou/len(val_dataloader)
         val_loss = val_loss/len(val_dataloader)
         
@@ -182,7 +160,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
     #checking if LR needs to be reduced
     scheduler.step(val_loss)
     learning_rates.append(scheduler.get_last_lr()[0])
-    
+    print("LR - ",scheduler.get_last_lr()[0])
     if counter>=args.lookback:
         print("Early Stopping Reached")
         break
