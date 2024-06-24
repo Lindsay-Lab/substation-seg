@@ -8,8 +8,7 @@ The aim of this project is to build a computer vision model for segmenting subst
 - dataloader.py - creates dataloader for the training
 - models.py - creates and instantiates different kinds of models
 - utils.py - stores the helped functions
-- Sentinel.py - training script for unet models
-- SwinTransformerPipeline.py - training script for swin models 
+- train.py - training script 
 
 ## Dataset Details:
 - dataset/image_stack and dataset/mask folders contain all the images and masks respectively.
