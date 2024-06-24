@@ -9,7 +9,8 @@ The aim of this project is to build a computer vision model for segmenting subst
 - models.py - creates and instantiates different kinds of models
 - utils.py - stores the helped functions
 - train.py - training script 
-
+- inference.py - script to run inference from trained models on images
+   
 ## Dataset Details:
 - dataset/image_stack and dataset/mask folders contain all the images and masks respectively.
 - There are a a total of 26522 images-mask pairs stored as numpy files.
