@@ -208,8 +208,8 @@ class FullImageDataset(torch.utils.data.Dataset):
         self.mask_2d = args.mask_2d
         self.model_type = args.model_type
         
-        self.image_dir = os.path.join(data_dir, 'image_stack')
-        self.mask_dir = os.path.join(data_dir, 'mask')
+        self.image_dir = os.path.join(args.data_dir, 'image_stack')
+        self.mask_dir = os.path.join(args.data_dir, 'mask')
         self.image_filenames = image_files
         
     def __getitem__(self, index):

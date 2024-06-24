@@ -74,16 +74,16 @@ class MiUnet(nn.Module):
             features.append(x)
         decoder_output = self.decoder(*features)
         raw_outputs = self.segmentation_head(decoder_output)
-        if args.loss == 'FOCAL':
-            loss = loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        if self.args.loss == 'FOCAL':
+            loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
         else :
-            loss = loss_fn(raw_outputs, target)
+            loss = self.loss_fn(raw_outputs, target)
         
         outputs = torch.nn.functional.sigmoid(raw_outputs)
         return outputs, loss        
 
 class ViT(nn.Module):
-    def __init__(self,encoder, embedding_dim=384, use_timepoints=False, loss_fn, args):
+    def __init__(self,encoder, loss_fn, args, embedding_dim=384, use_timepoints=False):
         super().__init__()
         self.encoder = encoder
         self.embedding_dim = embedding_dim
@@ -154,10 +154,10 @@ class ViT(nn.Module):
             feature = layer(feature)
         raw_outputs = self.conv(feature)
         
-        if args.loss == 'FOCAL':
-            loss = loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        if self.args.loss == 'FOCAL':
+            loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
         else :
-            loss = loss_fn(raw_outputs, target)
+            loss = self.loss_fn(raw_outputs, target)
             
         outputs = torch.nn.functional.sigmoid(raw_outputs)
         return outputs, loss
@@ -242,11 +242,11 @@ def setup_model(args):
     
     elif args.model_type == 'vit_torchgeo':
         vit_encoder = torchgeo.models.vit_small_patch16_224(args.pretrained_weights)
-        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints, loss_fn, args)
+        model = ViT(vit_encoder,  loss_fn, args, args.embedding_size, use_timepoints = args.use_timepoints)
         
     elif args.model_type == 'vit_imagenet':
         vit_encoder = timm.create_model(args.pretrained_weights, pretrained = args.pretrained)
-        model = ViT(vit_encoder, args.embedding_size, use_timepoints = args.use_timepoints, loss_fn, args)
+        model = ViT(vit_encoder, loss_fn, args, args.embedding_size, use_timepoints = args.use_timepoints)
         
     else:
         raise Exception("Incorrect Model Selected")
@@ -269,8 +269,12 @@ def setup_model(args):
     
     #Loading checkpoints            
     if args.resume_training:
-        #assert args.checkpoint is not None
-        checkpoint = torch.load(args.checkpoint)
+        if torch.cuda.is_available():
+            device = torch.device("cuda:0")    
+        else:
+            device = torch.device("cpu")
+        model = model.to(device)
+        checkpoint = torch.load(args.checkpoint,  map_location=device)
         model.load_state_dict(checkpoint)
         
     return model
