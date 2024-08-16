@@ -19,7 +19,7 @@ from torchmetrics.classification import BinaryJaccardIndex
 
 #our files
 import utils
-from dataloader import FullImageDataset
+from dataloader import FullImageDataset, PhilEO
 from models import setup_model
 
 #Parameters
@@ -46,7 +46,6 @@ geo_transform = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
     transforms.RandomRotation(degrees=15),
-#     transforms.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0)),
     transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
 ])
 # color_transform=color_transform = transforms.Compose([
@@ -57,26 +56,41 @@ color_transform=None
 image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
 mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,transforms.InterpolationMode.NEAREST, antialias=True)])
 
-image_dir = os.path.join(args.data_dir, 'image_stack')
-mask_dir = os.path.join(args.data_dir, 'mask')
-
-# for multi-image
-if args.use_timepoints:
-    with open("dataset/four_or_more_timepoints.pkl",'rb') as f:
-        image_filenames = pickle.load(f)
-else:
-    image_filenames = os.listdir(image_dir)
+if args.dataset='substation':
+    image_dir = os.path.join(os.path.join(args.data_dir,'substation'), 'image_stack')
+    mask_dir = os.path.join(os.path.join(args.data_dir,'substation'), 'mask')
     
-random.Random(args.seed).shuffle(image_filenames)
-train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
-val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
+    #for multi-image
+    if args.use_timepoints:
+        with open("dataset/four_or_more_timepoints.pkl",'rb') as f:
+            image_filenames = pickle.load(f)
+    else:
+        image_filenames = os.listdir(image_dir)
+    
+    random.Random(args.seed).shuffle(image_filenames)
+    train_set = image_filenames[:int(args.train_ratio*len(image_filenames))]
+    val_set = image_filenames[int(args.train_ratio*len(image_filenames)):]
+    
+    train_dataset = SubstationDataset(args, image_files=train_set, geo_transforms=geo_transform, color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize)
+    val_dataset = SubstationDataset(args, image_files=val_set, image_resize=image_resize, mask_resize=mask_resize,)
 
-train_dataset = FullImageDataset(args, image_files=train_set, geo_transforms=geo_transform, color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize)
-val_dataset = FullImageDataset(args, image_files=val_set, image_resize=image_resize, mask_resize=mask_resize,)
+else:
+    train_data_dir = os.path.join(args.data_dir,'PhilEO-downstream/processed_dataset/train')
+    train_image_dir = os.path.join(train_data_dir, 'images')
+    
+    val_data_dir = os.path.join(args.data_dir,'PhilEO-downstream/processed_dataset/val')
+    val_image_dir = os.path.join(val_data_dir, 'images')
+
+    train_image_filenames = os.listdir(train_image_dir)
+    val_image_filenames = os.listdir(val_image_dir)
+
+    train_dataset = PhilEODataset(args, data_dir = train_data_dir, image_files=train_image_filenames, geo_transforms=geo_transform, color_transforms= color_transform, image_resize=image_resize, mask_resize=mask_resize)
+    val_dataset = PhilEODataset(args, data_dir = val_data_dir, image_files=val_image_filenames, image_resize=image_resize, mask_resize=mask_resize,)
+
 
 train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory = True, num_workers = args.workers, drop_last=True)
 val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,  pin_memory = True,  num_workers = args.workers, drop_last=True)
-
+# print(len(train_dataloader), len(val_dataloader))
 
 #MODEL
 model = setup_model(args)
@@ -108,7 +122,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
     model.train();
     for i , batch in enumerate(train_dataloader):
         optimizer.zero_grad()
-        data, target = batch[0].to(device).float(), batch[1].to(device)
+        data, target = batch[0].to(device).float(), batch[1].to(device).float()
         output, loss = model(data, target)
 
         loss.backward()
@@ -147,6 +161,9 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         
     print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,", Validation IOU - ", val_iou)
     wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss, "Validation IoU":val_iou})
+
+    # print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,)
+    # wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss})
     
     if (e%10==0) or (val_loss < min_val_loss):
         torch.save(model.state_dict(), os.path.join(args.model_dir, f"{e+1}.pth"))
@@ -169,7 +186,7 @@ torch.save(model.state_dict(), os.path.join(args.model_dir, "end.pth"))
 
 print("train_loss = ",training_losses)
 print("val_loss = ",validation_losses)
-print("val_iou = ", validation_ious)
+# print("val_iou = ", validation_ious)
 print("learning_rates = ", learning_rates)
 
 

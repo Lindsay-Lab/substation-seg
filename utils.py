@@ -15,7 +15,8 @@ def parse_arguments(cmd_flag=False):
     
     if cmd_flag:
         parser = argparse.ArgumentParser(description = "Define parameters for configuring the models and training pipeline. This includes loss function, model_directiory, model_size, normalizing strategy etc")
-        parser.add_argument("-d","--data_dir", default = "/scratch/kj1447/gracelab/dataset", help="Data Directory")
+        parser.add_argument("-dd","--data_dir", default = "/scratch/kj1447/gracelab/dataset", help="Data Directory")
+        parser.add_argument("-d","--dataset", default = "substation", help="Which dataset to use - substation or phileo. If you use phileo, set task flag accordingly.")
         parser.add_argument("-m","--model_dir", help="Model Directory for Saving Checkpoints. A folder with this name would be created within the models folder")
         parser.add_argument("-l","--loss", default = "BCE", help="Can take following values - BCE, FOCAL or DICE")
         parser.add_argument("-a","--alpha", default = 0.25, type = float, help="Alpha Parameter for FOCAL Loss")
@@ -50,6 +51,7 @@ def parse_arguments(cmd_flag=False):
         # if cmdline arguments can't be passed. eg. when running through a jupyter notebook
         args = {}
         args['data_dir']= "/scratch/kj1447/gracelab/dataset"
+        args['dataset']='substation'
         args['model_dir'] = '/scratch/kj1447/gracelab/models/SWIN_FPN_low_LR'
         args['loss'] = "BCE"
         args['alpha'] = 0.25
