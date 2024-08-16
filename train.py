@@ -141,29 +141,31 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
         for batch in val_dataloader:
             data, target = batch[0].to(device).float(), batch[1].to(device)
             output,loss = model(data, target)
-
-            if args.model_type=='swin':
-                pred_mask = torch.argmax(output, dim=1)
-                iou = iou_metric(pred_mask, torch.argmax(target, dim = 1))
-            else:
-                pred_mask = (output > 0.5).float()
-                iou = iou_metric(pred_mask, target)
-            val_iou+=iou.item()
-            val_loss += loss.item()
-        val_iou = val_iou/len(val_dataloader)
-        val_loss = val_loss/len(val_dataloader)
+            if args.type_of_model == 'classification':
+                if args.model_type=='swin':
+                    pred_mask = torch.argmax(output, dim=1)
+                    iou = iou_metric(pred_mask, torch.argmax(target, dim = 1))
+                else:
+                    pred_mask = (output > 0.5).float()
+                    iou = iou_metric(pred_mask, target)
+                val_iou+=iou.item()
+                val_loss += loss.item()
+        if args.type_of_model == 'classification':
+            val_iou = val_iou/len(val_dataloader)
+            validation_ious.append(val_iou)
         
+        val_loss = val_loss/len(val_dataloader)
+        validation_losses.append(val_loss)
+
         if e == args.starting_epoch:
             min_val_loss=val_loss
-            
-        validation_losses.append(val_loss)
-        validation_ious.append(val_iou)
-        
-    print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,", Validation IOU - ", val_iou)
-    wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss, "Validation IoU":val_iou})
-
-    # print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,)
-    # wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss})
+    
+    if args.type_of_model == 'classification':
+        print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,", Validation IOU - ", val_iou)
+        wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss, "Validation IoU":val_iou})
+    else:
+        print("Epoch-",e,"| Training Loss - ",train_loss,", Validation Loss - ",val_loss,)
+        wandb.log({"Training Loss": train_loss, "Validation Loss": val_loss})
     
     if (e%10==0) or (val_loss < min_val_loss):
         torch.save(model.state_dict(), os.path.join(args.model_dir, f"{e+1}.pth"))
@@ -186,7 +188,7 @@ torch.save(model.state_dict(), os.path.join(args.model_dir, "end.pth"))
 
 print("train_loss = ",training_losses)
 print("val_loss = ",validation_losses)
-# print("val_iou = ", validation_ious)
+print("val_iou = ", validation_ious)
 print("learning_rates = ", learning_rates)
 
 
