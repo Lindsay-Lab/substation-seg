@@ -9,10 +9,17 @@ import segmentation_models_pytorch as smp
 from torchvision.ops import sigmoid_focal_loss
 
 class SwinWithUpSample(nn.Module):
-    def __init__(self, fpn_model):
+    
+    def __init__(self, fpn_model, args):
         super(SwinWithUpSample, self).__init__()
+        self.args = args
         self.mid_channels = 128
-        self.num_outputs=2
+        
+        if self.args.type_of_model == 'classification':
+            self.num_outputs=2
+        else:
+            self.num_outputs = 1
+            
         self.fpn_model = fpn_model
         self.upsampler = nn.Sequential(
             nn.Conv2d(self.mid_channels, self.mid_channels, 3, padding=1),
@@ -31,19 +38,30 @@ class SwinWithUpSample(nn.Module):
             torch.nn.Conv2d(self.mid_channels//4, self.num_outputs, 3, padding=1),
         )
                 
-        def loss_func(logits, targets):
+        def classification_loss_func(logits, targets):
             targets = targets.argmax(dim=1)
             return torch.nn.functional.cross_entropy(logits, targets, reduction='none')[:, None, :, :]
-        self.loss_func = loss_func
+
+        def regression_loss_func(logit, targets):
+            return torch.nn.functional.mse_loss(logits, targets, reduction='none')
+        
+        if self.args.type_of_model == 'classification':
+            self.loss_func = classification_loss_func
+        else:
+            self.loss_func = regression_loss_func
         
         
     def forward(self, image, target=None):
         loss=None
         feature = self.fpn_model(image)
         raw_outputs = self.upsampler(feature[0])
-        outputs = torch.nn.functional.softmax(raw_outputs, dim=1)
+        
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.softmax(raw_outputs, dim=1)
+        else :
+            outputs = raw_outputs
+        
         if target is not None:
-            #task_targets = torch.stack([target for target in targets], dim=0).float()
             loss = self.loss_func(raw_outputs, target)
             loss = loss.mean()
         return outputs, loss
@@ -54,23 +72,24 @@ class MiUnet(nn.Module):
         self.encoder = unet.encoder
         self.decoder = unet.decoder
         self.segmentation_head = unet.segmentation_head
-        self.num_images_per_timepoint = 4  
+        # self.num_images_per_timepoint = 3  
         self.loss_fn = loss_fn
         self.args = args
         
     def forward(self, image, target):
         bs, cxi, w, h = image.shape
-        image = torch.reshape(image, (bs, self.num_images_per_timepoint, -1, w,h))
+        num_timepoints = cxi// self.args.in_channels
+            
+        image = torch.reshape(image, (bs, num_timepoints, -1, w,h))
         bs, t, c, w, h = image.shape
         image = torch.reshape(image, (-1,c,w,h))
-        
         temp = self.encoder(image)
         features = []
         for i in range(len(temp)):
             bsxi, c, w, h = temp[i].shape
-            x=torch.reshape(temp[i],(-1,self.num_images_per_timepoint,c, w, h)).permute(1,0,2,3,4) #4,bs,c,w,h
-            # x = torch.amax(x, 0) #or use this -> x = torch.maximum(torch.maximum(torch.maximum(x[0],x[1]),x[2]), x[3])
-            x = torch.mean(x, 0) #average pooling of multiple timepoints
+            x=torch.reshape(temp[i],(-1,num_timepoints,c, w, h)).permute(1,0,2,3,4) #t,bs,c,w,h
+            x = torch.amax(x, 0) #or use this -> x = torch.maximum(torch.maximum(torch.maximum(x[0],x[1]),x[2]), x[3])
+            # x = torch.mean(x, 0) #average pooling of multiple timepoints
             features.append(x)
         decoder_output = self.decoder(*features)
         raw_outputs = self.segmentation_head(decoder_output)
@@ -79,7 +98,11 @@ class MiUnet(nn.Module):
         else :
             loss = self.loss_fn(raw_outputs, target)
         
-        outputs = torch.nn.functional.sigmoid(raw_outputs)
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.sigmoid(raw_outputs)
+        else:
+            outputs = raw_outputs
+            
         return outputs, loss        
 
 class ViT(nn.Module):
@@ -89,7 +112,7 @@ class ViT(nn.Module):
         self.embedding_dim = embedding_dim
         self.output_embed_dim = 1
         self.use_timepoints = use_timepoints
-        self.num_timepoints = 4
+        # self.num_timepoints = 3
         num_convs=4
         num_convs_per_upscale=1
         self.loss_fn = loss_fn
@@ -140,14 +163,15 @@ class ViT(nn.Module):
 
     def forward(self, image, target):
         bs, cxt, h, w = image.shape
+        num_timepoints = cxt// self.args.in_channels
         if self.use_timepoints:
-            image = image.reshape(bs, self.num_timepoints, -1, h, w)
+            image = image.reshape(bs, num_timepoints, -1, h, w)
             b, t, c, h, w = image.shape
             image = image.reshape(-1, c, h, w)
             
         feature = self.encoder.forward_features(image)
         if self.use_timepoints:
-            temporal_features = feature.reshape(-1, self.num_timepoints, feature.shape[1], feature.shape[2]).permute(1,0,2,3)
+            temporal_features = feature.reshape(-1, num_timepoints, feature.shape[1], feature.shape[2]).permute(1,0,2,3)
             feature = torch.amax(temporal_features, dim = 0)
         feature = feature[:,1:,:].view(-1,14,14,self.embedding_dim).permute(0,3,1,2)
         for layer in self.layers:
@@ -158,9 +182,33 @@ class ViT(nn.Module):
             loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
         else :
             loss = self.loss_fn(raw_outputs, target)
-            
-        outputs = torch.nn.functional.sigmoid(raw_outputs)
+        
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.sigmoid(raw_outputs)
+        else: 
+            outputs = raw_outputs
+        
         return outputs, loss
+
+class VanillaUnet(nn.Module):
+    def __init__(self, unet, loss_fn, args):
+        super().__init__()
+        self.unet = unet
+        self.loss_fn = loss_fn
+        self.args = args
+        
+    def forward(self, image, target):
+        raw_outputs = self.unet(image) 
+        if self.args.loss == 'FOCAL':
+            loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        else :
+            loss = self.loss_fn(raw_outputs, target)
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.sigmoid(raw_outputs)
+        else:
+            outputs = raw_outputs
+        return outputs, loss
+        
         
 def update_layers(model):
     children = list(model.children())
@@ -183,6 +231,10 @@ def setup_loss_func(args):
             
             elif args.loss == 'FOCAL':
                 loss_fn = sigmoid_focal_loss
+
+            elif args.loss == 'MSE':
+                criterion = nn.MSELoss()
+                loss_fn = lambda output, target: criterion(output, target)
         else:
             loss_fn = None
         return loss_fn
@@ -195,13 +247,14 @@ def setup_model(args):
             
     #Setting Up Model
     if args.model_type == 'vanilla_unet':        
-        model = smp.Unet(
+        unet = smp.Unet(
             encoder_name="resnet50",       
             encoder_weights=None,     
             in_channels=args.in_channels,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=1,                      # model output channels (number of classes in your dataset)
         #     activation = 'sigmoid'     # because using sigmoid_focal_loss
         )
+        model = VanillaUnet(unet, loss_fn, args)
     
     elif args.model_type == 'mi_unet':
         unet = smp.Unet(
@@ -235,7 +288,7 @@ def setup_model(args):
             #MODEL with learned upsampling
             weights_manager = satlaspretrain_models.Weights()
             fpn_model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True,)
-            model = SwinWithUpSample(fpn_model)
+            model = SwinWithUpSample(fpn_model,args)
         else:
             weights_manager = satlaspretrain_models.Weights()
             model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
@@ -258,7 +311,9 @@ def setup_model(args):
             state_dict = args.pretrained_weights.get_state_dict(progress=True)
             if args.model_type == 'modified_unet':
                 model.unet.encoder.load_state_dict(state_dict)
-            elif args.model_type == 'vanilla_unet' or args.model_type == 'mi_unet': 
+            elif args.model_type == 'vanilla_unet':
+                model.unet.encoder.load_state_dict(state_dict)
+            elif args.model_type == 'mi_unet': 
                 model.encoder.load_state_dict(state_dict)
             else:
                 raise Exception("Incorrect combination of weights and model")
