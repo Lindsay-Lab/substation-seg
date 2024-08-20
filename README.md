@@ -6,6 +6,10 @@ The aim of this project is to build a computer vision model for segmenting subst
   - substation
     - image_stack
     - mask
+    - negatives
+      - image_stack
+      - mask
+    - four_or_more_timepoints.pkl
   - PhilEO-downstream/processed_dataset
     - train
       - images
@@ -18,7 +22,7 @@ The aim of this project is to build a computer vision model for segmenting subst
 - models.py - creates and instantiates different kinds of models
 - utils.py - stores the helped functions
 - train.py - training script 
-- inference.py - script to run inference from trained models on images
+- inference.ipynb - script to run inference from trained models on images
    
 ## Dataset Details:
 **Substation Dataset**
