@@ -13,9 +13,7 @@ The aim of this project is to build a computer vision model for segmenting subst
       - road_mask
       - lc_mask
     - test
-      - ...
     - val
-      - ...
 - dataloader.py - creates dataloader for the training
 - models.py - creates and instantiates different kinds of models
 - utils.py - stores the helped functions
@@ -31,13 +29,13 @@ The aim of this project is to build a computer vision model for segmenting subst
 - Spatial Resolution of each image is 228*228.
 - You can download the dataset from here - [images](https://urldefense.proofpoint.com/v2/url?u=https-3A__storage.googleapis.com_tz-2Dml-2Dpublic_substation-2Dover-2D10km2-2Dcsv-2Dmain-2D444e360fd2b6444b9018d509d0e4f36e_image-5Fstack.tar.gz&d=DwMFaQ&c=slrrB7dE8n7gBJbeO0g-IQ&r=ypwhORbsf5rB8FTl-SAxjfN_U0jrVqx6UDyBtJHbKQY&m=-2QXCp-gZof5HwBsLg7VwQD-pnLedAo09YCzdDCUTqCI-0t789z0-HhhgwVbYtX7&s=zMCjuqjPMHRz5jeEWLCEufHvWxRPdlHEbPnUE7kXPrc&e=) and [masks](https://urldefense.proofpoint.com/v2/url?u=https-3A__storage.googleapis.com_tz-2Dml-2Dpublic_substation-2Dover-2D10km2-2Dcsv-2Dmain-2D444e360fd2b6444b9018d509d0e4f36e_mask.tar.gz&d=DwMFaQ&c=slrrB7dE8n7gBJbeO0g-IQ&r=ypwhORbsf5rB8FTl-SAxjfN_U0jrVqx6UDyBtJHbKQY&m=-2QXCp-gZof5HwBsLg7VwQD-pnLedAo09YCzdDCUTqCI-0t789z0-HhhgwVbYtX7&s=nHMdYvxKmzwAdT2lOPoQ7-NEfjsOjAm00kHOcwC_AmU&e=)
 - The negatives comprising of global random images can be found here - [images](https://urldefense.proofpoint.com/v2/url?u=https-3A__storage.googleapis.com_tz-2Dml-2Dpublic_random-2Dsample-2Dcsv-2Dmain-2Da15f73c0e4b94102be4b2aea3b8ef80c_image-5Fstack.tar.gz&d=DwMFaQ&c=slrrB7dE8n7gBJbeO0g-IQ&r=ypwhORbsf5rB8FTl-SAxjfN_U0jrVqx6UDyBtJHbKQY&m=-2QXCp-gZof5HwBsLg7VwQD-pnLedAo09YCzdDCUTqCI-0t789z0-HhhgwVbYtX7&s=z2YEwx2lSeF-aOQSzkZ_XuQ0qyqkukW7n47N8luln5M&e=) and [masks](https://urldefense.proofpoint.com/v2/url?u=https-3A__storage.googleapis.com_tz-2Dml-2Dpublic_random-2Dsample-2Dcsv-2Dmain-2Da15f73c0e4b94102be4b2aea3b8ef80c_mask.tar.gz&d=DwMFaQ&c=slrrB7dE8n7gBJbeO0g-IQ&r=ypwhORbsf5rB8FTl-SAxjfN_U0jrVqx6UDyBtJHbKQY&m=-2QXCp-gZof5HwBsLg7VwQD-pnLedAo09YCzdDCUTqCI-0t789z0-HhhgwVbYtX7&s=LgGOFb6qIn0SNwbG4DTEunWbIgcHdnW2PIWCMvlKboY&e=)  
-
-Sample image and mask pair are given below -
+- Sample image and mask pair are given below -
 <p align="center" width="100%">
   <img width="640px" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_input.png">
 </p>
 
 **PhilEO Dataset**
+
 You can find more information about this dataset on [huggingface](https://huggingface.co/datasets/PhilEO-community/PhilEO-downstream)
 
 
