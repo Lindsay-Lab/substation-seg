@@ -41,9 +41,9 @@ The aim of this project is to build a computer vision model for segmenting subst
 **PhilEO Dataset**
 
 - You can find more information about this dataset on [huggingface](https://huggingface.co/datasets/PhilEO-community/PhilEO-downstream)
-- - Sample image and building mask pair are given below -
+- Sample image and building mask pair are given below -
 <p align="center" width="100%">
-  <img width="500" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/phileo_example_input_building_v2.png">
+  <img width="500" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/phileo_example_input_building.png">
 </p>
 
 
