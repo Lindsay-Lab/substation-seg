@@ -92,4 +92,4 @@ Advancing Super-Resolution for Remote Sensing. 2023. arXiv:2311.18082 [cs.CV].
 
 
 ## Contact
-For questions and queries please reach out to [Kartik Jindgar](kartik.jindgar@nyu.edu) and [Grace Lindsay](grace.lindsay@nyu.edu)
+For questions and queries please reach out to [Kartik Jindgar](mailto:kartik.jindgar@nyu.edu) and [Grace Lindsay](mailto:grace.lindsay@nyu.edu)
