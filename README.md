@@ -40,7 +40,11 @@ The aim of this project is to build a computer vision model for segmenting subst
 
 **PhilEO Dataset**
 
-You can find more information about this dataset on [huggingface](https://huggingface.co/datasets/PhilEO-community/PhilEO-downstream)
+- You can find more information about this dataset on [huggingface](https://huggingface.co/datasets/PhilEO-community/PhilEO-downstream)
+- - Sample image and building mask pair are given below -
+<p align="center" width="100%">
+  <img width="500" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/phileo_example_input_building_v2.png">
+</p>
 
 
 ## Running Training Scripts
@@ -60,7 +64,7 @@ We train all models by minimizing Per-Pixel Binary Cross Entropy Loss and comput
 </p>
 
 
-Sample outputs from our best models is provided below - 
+Sample outputs from our best models areprovided below - 
 
 <p align="center" width="100%">
   <img width="75%" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_output.png">
