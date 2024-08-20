@@ -3,8 +3,19 @@ The aim of this project is to build a computer vision model for segmenting subst
 
 ## The directory structure:
 - dataset
-  - image_stack
-  - mask
+  - substation
+    - image_stack
+    - mask
+  - PhilEO-downstream/processed_dataset
+    - train
+      - images
+      - building_mask
+      - road_mask
+      - lc_mask
+    - test
+      - ...
+    - val
+      - ...
 - dataloader.py - creates dataloader for the training
 - models.py - creates and instantiates different kinds of models
 - utils.py - stores the helped functions
@@ -25,6 +36,9 @@ Sample image and mask pair are given below -
 <p align="center" width="100%">
   <img width="640px" src="https://github.com/Lindsay-Lab/substation-seg/blob/main/artifacts/example_input.png">
 </p>
+
+**PhilEO Dataset**
+You can find more information about this dataset on [huggingface](https://huggingface.co/datasets/PhilEO-community/PhilEO-downstream)
 
 
 ## Running Training Scripts
