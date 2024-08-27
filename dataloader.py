@@ -209,8 +209,8 @@ class SubstationDataset(torch.utils.data.Dataset):
         self.mask_2d = args.mask_2d
         self.model_type = args.model_type
         
-        self.image_dir = os.path.join(args.data_dir, 'image_stack')
-        self.mask_dir = os.path.join(args.data_dir, 'mask')
+        self.image_dir = os.path.join(os.path.join(args.data_dir,'substation'), 'image_stack')
+        self.mask_dir = os.path.join(os.path.join(args.data_dir,'substation'), 'mask')
         self.image_filenames = image_files
         self.args = args
         
@@ -246,11 +246,17 @@ class SubstationDataset(torch.utils.data.Dataset):
         #handling multiple images across timepoints
         if self.use_timepoints: 
             image = image[:4,:,:,:]
-            image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #(4*channels,h,w)
+            if self.args.timepoint_aggregation == 'concat':
+                image = np.reshape(image, (-1, image.shape[2], image.shape[3])) #(4*channels,h,w)
+            elif self.args.timepoint_aggregation == 'median':
+                image = np.median(image, axis=0)  
         else: 
             # image = np.median(image, axis=0)
             # image = image[0]
-            image = image[np.random.randint(image.shape[0])]
+            if self.args.timepoint_aggregation == 'first':
+                image = image[0]
+            elif self.args.timepoint_aggregation == 'random':
+                image = image[np.random.randint(image.shape[0])]
             
         mask = np.load(mask_path)['arr_0']
         mask[mask != 3] = 0

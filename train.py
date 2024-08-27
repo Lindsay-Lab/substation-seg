@@ -19,7 +19,7 @@ from torchmetrics.classification import BinaryJaccardIndex
 
 #our files
 import utils
-from dataloader import FullImageDataset, PhilEO
+from dataloader import SubstationDataset, PhilEODataset
 from models import setup_model
 
 #Parameters
@@ -56,13 +56,13 @@ color_transform=None
 image_resize = transforms.Compose([transforms.Resize(args.upsampled_image_size,transforms.InterpolationMode.BICUBIC, antialias=True)])
 mask_resize = transforms.Compose([transforms.Resize(args.upsampled_mask_size,transforms.InterpolationMode.NEAREST, antialias=True)])
 
-if args.dataset='substation':
+if args.dataset=='substation':
     image_dir = os.path.join(os.path.join(args.data_dir,'substation'), 'image_stack')
     mask_dir = os.path.join(os.path.join(args.data_dir,'substation'), 'mask')
     
     #for multi-image
     if args.use_timepoints:
-        with open("dataset/four_or_more_timepoints.pkl",'rb') as f:
+        with open(os.path.join(os.path.join(args.data_dir,"substation"),"four_or_more_timepoints.pkl"),'rb') as f:
             image_filenames = pickle.load(f)
     else:
         image_filenames = os.listdir(image_dir)
