@@ -43,7 +43,8 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-enu", "--exp_number",  default=1,  help = "Experiment Number with same setting for wanDB tracking")
         parser.add_argument("-t", "--task",  default='building',  help = "Used to define different segmentation task for the PhilEO dataset. Values = building, roads or lc")
         parser.add_argument("-vs","--vit_size", default = 'base', help='vit architecture')
-        parser.add_argument("-tom","type_of_model", default='classification', help='Defines if the model performs a classification task or a regression task')
+        parser.add_argument("-tom","--type_of_model", default='classification', help='Defines if the model performs a classification task or a regression task')
+        parser.add_argument('-ta','--timepoint_aggregation', default = 'concat', help='Defines how to use multiple timepoint. Either concat or take a median. For single image input, it takes values - first or random')
 
         args = vars(parser.parse_args())
     
@@ -79,7 +80,7 @@ def parse_arguments(cmd_flag=False):
         args['vit_size'] ='base'
         args['task'] = 'building'
         args['type_of_model']='classification'
-    
+        args['timepoint_aggregation']='concat'
     args = dotdict(args)
     args = sanity_checks(args)
     print(args)
