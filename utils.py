@@ -18,7 +18,7 @@ def parse_arguments(cmd_flag=False):
         parser.add_argument("-dd","--data_dir", default = "/scratch/kj1447/gracelab/dataset", help="Data Directory")
         parser.add_argument("-d","--dataset", default = "substation", help="Which dataset to use - substation or phileo. If you use phileo, set task flag accordingly.")
         parser.add_argument("-m","--model_dir", help="Model Directory for Saving Checkpoints. A folder with this name would be created within the models folder")
-        parser.add_argument("-l","--loss", default = "BCE", help="Can take following values - BCE, FOCAL or DICE")
+        parser.add_argument("-l","--loss", default = "BCE", help="Can take following values - MSE, BCE, FOCAL or DICE")
         parser.add_argument("-a","--alpha", default = 0.25, type = float, help="Alpha Parameter for FOCAL Loss")
         parser.add_argument("-e","--epochs", default = 250, type = int, help="Number of epochs")
         parser.add_argument("-bs","--batch_size", default = 32, type=int, help="Batch Size")

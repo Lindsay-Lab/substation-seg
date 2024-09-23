@@ -42,7 +42,7 @@ class SwinWithUpSample(nn.Module):
             targets = targets.argmax(dim=1)
             return torch.nn.functional.cross_entropy(logits, targets, reduction='none')[:, None, :, :]
 
-        def regression_loss_func(logit, targets):
+        def regression_loss_func(logits, targets):
             return torch.nn.functional.mse_loss(logits, targets, reduction='none')
         
         if self.args.type_of_model == 'classification':

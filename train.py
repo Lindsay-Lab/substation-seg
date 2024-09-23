@@ -149,7 +149,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
                     pred_mask = (output > 0.5).float()
                     iou = iou_metric(pred_mask, target)
                 val_iou+=iou.item()
-                val_loss += loss.item()
+            val_loss += loss.item()
         if args.type_of_model == 'classification':
             val_iou = val_iou/len(val_dataloader)
             validation_ious.append(val_iou)
