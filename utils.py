@@ -89,7 +89,7 @@ def parse_arguments(cmd_flag=False):
 def sanity_checks(args):
     
     #Defining Pretrained Weights
-    if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' or args.model_type == 'mi_unet':
+    if args.model_type == 'vanilla_unet' or args.model_type =='modified_unet' or args.model_type == 'mi_unet' or args.model_type == 'mi_unet_output_space':
         if args.pretrained:
             if args.in_channels == 3:
                 args.pretrained_weights = ResNet50_Weights.SENTINEL2_RGB_MOCO
@@ -100,7 +100,7 @@ def sanity_checks(args):
         else:
             args.pretrained_weights = None
         
-    elif args.model_type=='swin':
+    elif args.model_type=='swin' or args.model_type=='swin_output_space' :
         if args.in_channels == 3:    
             if args.use_timepoints:
                 args.pretrained_weights = "Sentinel2_SwinB_MI_RGB"
@@ -114,7 +114,7 @@ def sanity_checks(args):
         args.pretrained_weights = ViTSmall16_Weights.SENTINEL2_ALL_DINO
         args.embedding_size = 384
     
-    elif args.model_type == 'vit_imagenet':
+    elif args.model_type == 'vit_imagenet' or args.model_type == 'vit_imagenet_output_space' :
         if args.vit_size=='small':
             args.pretrained_weights='vit_small_patch16_224'
             args.embedding_size = 384
@@ -174,7 +174,7 @@ def sanity_checks(args):
             raise Warning("Vit Torchgeo Model can take only 13 channles. Setting input channels to 13.")
             args.in_channels = 13
 
-    if args.model_type =='swin':
+    if args.model_type =='swin' or args.model_type == 'swin_output_space':
         args.mask_2d=True
     else:
         args.mask_2d=False

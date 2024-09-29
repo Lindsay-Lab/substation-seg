@@ -142,7 +142,7 @@ for e in range(args.starting_epoch,args.starting_epoch+args.epochs):
             data, target = batch[0].to(device).float(), batch[1].to(device)
             output,loss = model(data, target)
             if args.type_of_model == 'classification':
-                if args.model_type=='swin':
+                if args.model_type=='swin' or args.model_type =='swin_output_space':
                     pred_mask = torch.argmax(output, dim=1)
                     iou = iou_metric(pred_mask, torch.argmax(target, dim = 1))
                 else:

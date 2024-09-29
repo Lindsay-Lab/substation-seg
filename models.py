@@ -58,7 +58,71 @@ class SwinWithUpSample(nn.Module):
         
         if self.args.type_of_model == 'classification':
             outputs = torch.nn.functional.softmax(raw_outputs, dim=1)
-        else :
+        else:
+            outputs = raw_outputs
+        
+        if target is not None:
+            loss = self.loss_func(raw_outputs, target)
+            loss = loss.mean()
+        return outputs, loss
+
+
+class SwinWithUpSample_output_space(nn.Module):
+    
+    def __init__(self, fpn_model, args):
+        super(SwinWithUpSample_output_space, self).__init__()
+        self.args = args
+        self.mid_channels = 128
+        
+        if self.args.type_of_model == 'classification':
+            self.num_outputs=2
+        else:
+            self.num_outputs = 1
+            
+        self.fpn_model = fpn_model
+        self.upsampler = nn.Sequential(
+            nn.Conv2d(self.mid_channels, self.mid_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(self.mid_channels, self.mid_channels // 2, kernel_size=2, stride=2),
+            nn.Conv2d(self.mid_channels // 2, self.mid_channels // 2, kernel_size=3, padding=1),
+            #nn.BatchNorm2d(self.mid_channels // 2),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(self.mid_channels // 2, self.mid_channels // 4, kernel_size=2, stride=2),
+            nn.Conv2d(self.mid_channels // 4, self.mid_channels // 4, kernel_size=3, padding=1),
+            #nn.BatchNorm2d(self.mid_channels // 4),
+            nn.ReLU(inplace=True),
+
+            torch.nn.Conv2d(self.mid_channels//4, self.num_outputs, 3, padding=1),
+        )
+                
+        def classification_loss_func(logits, targets):
+            targets = targets.argmax(dim=1)
+            return torch.nn.functional.cross_entropy(logits, targets, reduction='none')[:, None, :, :]
+
+        def regression_loss_func(logits, targets):
+            return torch.nn.functional.mse_loss(logits, targets, reduction='none')
+        
+        if self.args.type_of_model == 'classification':
+            self.loss_func = classification_loss_func
+        else:
+            self.loss_func = regression_loss_func
+        
+        
+    def forward(self, image, target=None):
+        loss=None
+        bs, cxt, h, w = image.shape
+        num_timepoints = cxt// self.args.in_channels
+        image = torch.reshape(image, (-1, self.args.in_channels, h,w))
+        feature = self.fpn_model(image)
+        raw_outputs = self.upsampler(feature[0])
+        raw_outputs = torch.reshape(raw_outputs, (bs, num_timepoints, raw_outputs.shape[1], raw_outputs.shape[2],  raw_outputs.shape[3]))
+        raw_outputs = torch.median(raw_outputs, dim = 1)[0] #bs, c, h, w
+        
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.softmax(raw_outputs, dim=1)
+        else:
             outputs = raw_outputs
         
         if target is not None:
@@ -105,6 +169,42 @@ class MiUnet(nn.Module):
             
         return outputs, loss        
 
+class MiUnet_OutputSpace(nn.Module):
+    def __init__(self, unet, loss_fn, args):
+        super(MiUnet_OutputSpace,self).__init__()
+        self.encoder = unet.encoder
+        self.decoder = unet.decoder
+        self.segmentation_head = unet.segmentation_head
+        # self.num_images_per_timepoint = 3  
+        self.loss_fn = loss_fn
+        self.args = args
+        
+    def forward(self, image, target):
+        bs, cxi, w, h = image.shape
+        num_timepoints = cxi// self.args.in_channels
+            
+        image = torch.reshape(image, (bs, num_timepoints, -1, w,h))
+        bs, t, c, w, h = image.shape
+        image = torch.reshape(image, (-1,c,w,h))
+        temp = self.encoder(image)
+        decoder_output = self.decoder(*temp)
+        raw_outputs = self.segmentation_head(decoder_output) # bsxi,c, w,h 
+        bsxi, c, w, h = raw_outputs.shape 
+        raw_outputs = torch.reshape(raw_outputs, (-1,num_timepoints,c, w, h))#bs,t,c,w,h
+        raw_outputs = torch.median(raw_outputs, dim = 1)[0] # bs, c, w, h
+
+        if self.args.loss == 'FOCAL':
+            loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        else :
+            loss = self.loss_fn(raw_outputs, target)
+        
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.sigmoid(raw_outputs)
+        else:
+            outputs = raw_outputs
+            
+        return outputs, loss
+        
 class ViT(nn.Module):
     def __init__(self,encoder, loss_fn, args, embedding_dim=384, use_timepoints=False):
         super().__init__()
@@ -177,6 +277,93 @@ class ViT(nn.Module):
         for layer in self.layers:
             feature = layer(feature)
         raw_outputs = self.conv(feature)
+        
+        if self.args.loss == 'FOCAL':
+            loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
+        else :
+            loss = self.loss_fn(raw_outputs, target)
+        
+        if self.args.type_of_model == 'classification':
+            outputs = torch.nn.functional.sigmoid(raw_outputs)
+        else: 
+            outputs = raw_outputs
+        
+        return outputs, loss
+
+class ViT_ouput_space(nn.Module):
+    def __init__(self,encoder, loss_fn, args, embedding_dim=384, use_timepoints=False):
+        super(ViT_ouput_space, self).__init__()
+        self.encoder = encoder
+        self.embedding_dim = embedding_dim
+        self.output_embed_dim = 1
+        self.use_timepoints = use_timepoints
+        # self.num_timepoints = 3
+        num_convs=4
+        num_convs_per_upscale=1
+        self.loss_fn = loss_fn
+        self.args = args
+        
+        self.channels = [self.embedding_dim // (2 ** i) for i in range(num_convs)]
+        self.channels = [self.embedding_dim] + self.channels
+
+        
+        def _build_upscale_block(channels_in, channels_out):
+            
+            conv_kernel_size = 3
+            conv_padding = 1
+            kernel_size = 2
+            stride = 2
+            dilation = 1
+            padding = 0
+            output_padding = 0
+            
+            layers = []
+            layers.append(nn.ConvTranspose2d(
+                channels_in,
+                channels_out,
+                kernel_size=kernel_size,
+                stride=stride,
+                dilation=dilation,
+                padding=padding,
+                output_padding=output_padding,
+            ))
+
+            layers += [nn.Sequential(
+                      nn.Conv2d(channels_out,
+                      channels_out,
+                      kernel_size=conv_kernel_size,
+                      padding=conv_padding),
+                      nn.BatchNorm2d(channels_out),
+                      nn.Dropout(),
+                      nn.ReLU()) for _ in range(num_convs_per_upscale)]
+
+            return nn.Sequential(*layers)
+
+        self.layers = nn.ModuleList([
+            _build_upscale_block(self.channels[i], self.channels[i+1])
+            for i in range(len(self.channels) - 1)
+        ])
+
+        self.conv = nn.Conv2d(self.channels[-1], self.output_embed_dim, kernel_size = 3, padding=1)
+
+    def forward(self, image, target):
+        bs, cxt, h, w = image.shape
+        num_timepoints = cxt// self.args.in_channels
+        if self.use_timepoints:
+            image = image.reshape(bs, num_timepoints, -1, h, w)
+            b, t, c, h, w = image.shape
+            image = image.reshape(-1, c, h, w)
+            
+        feature = self.encoder.forward_features(image)
+        feature = feature[:,1:,:].view(-1,14,14,self.embedding_dim).permute(0,3,1,2)
+        for layer in self.layers:
+            feature = layer(feature)
+        raw_outputs = self.conv(feature)
+        
+        if self.use_timepoints:
+            raw_outputs = raw_outputs.reshape(bs,t,raw_outputs.shape[1], raw_outputs.shape[2], raw_outputs.shape[3]) # bs, t, c, h, w
+            raw_outputs = torch.median(raw_outputs, dim = 1)[0] #bs, c, h, w
+
         
         if self.args.loss == 'FOCAL':
             loss = self.loss_fn(raw_outputs, target, alpha = args.alpha, reduction = 'mean')
@@ -265,6 +452,15 @@ def setup_model(args):
         )
         model = MiUnet(unet, loss_fn, args)
         
+    elif args.model_type == 'mi_unet_output_space':
+        unet = smp.Unet(
+            encoder_name="resnet50",       
+            encoder_weights=None,     
+            in_channels=args.in_channels,                  
+            classes=1,
+        )
+        model = MiUnet_OutputSpace(unet, loss_fn, args)
+    
     elif args.model_type == 'modified_unet':
         
         class ModifiedUNET(nn.Module):
@@ -293,6 +489,16 @@ def setup_model(args):
             weights_manager = satlaspretrain_models.Weights()
             model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
     
+    elif args.model_type == 'swin_output_space':
+        if args.learned_upsampling:
+            #MODEL with learned upsampling
+            weights_manager = satlaspretrain_models.Weights()
+            fpn_model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True,)
+            model = SwinWithUpSample_output_space(fpn_model,args)
+        else:
+            weights_manager = satlaspretrain_models.Weights()
+            model = weights_manager.get_pretrained_model(args.pretrained_weights, fpn = True, head = satlaspretrain_models.Head.BINSEGMENT, num_categories = 2)
+    
     elif args.model_type == 'vit_torchgeo':
         vit_encoder = torchgeo.models.vit_small_patch16_224(args.pretrained_weights)
         model = ViT(vit_encoder,  loss_fn, args, args.embedding_size, use_timepoints = args.use_timepoints)
@@ -300,6 +506,10 @@ def setup_model(args):
     elif args.model_type == 'vit_imagenet':
         vit_encoder = timm.create_model(args.pretrained_weights, pretrained = args.pretrained)
         model = ViT(vit_encoder, loss_fn, args, args.embedding_size, use_timepoints = args.use_timepoints)
+        
+    elif args.model_type == 'vit_imagenet_output_space':
+        vit_encoder = timm.create_model(args.pretrained_weights, pretrained = args.pretrained)
+        model = ViT_ouput_space(vit_encoder, loss_fn, args, args.embedding_size, use_timepoints = args.use_timepoints)
         
     else:
         raise Exception("Incorrect Model Selected")
@@ -314,6 +524,8 @@ def setup_model(args):
             elif args.model_type == 'vanilla_unet':
                 model.unet.encoder.load_state_dict(state_dict)
             elif args.model_type == 'mi_unet': 
+                model.encoder.load_state_dict(state_dict)
+            elif args.model_type == 'mi_unet_output_space': 
                 model.encoder.load_state_dict(state_dict)
             else:
                 raise Exception("Incorrect combination of weights and model")
