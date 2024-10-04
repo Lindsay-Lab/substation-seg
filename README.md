@@ -1,5 +1,5 @@
 # Substation segmentation
-The aim of this project is to build a computer vision model for segmenting substations in Sentinel 2 satellite imagery. This directory contains code to train and evaluate multiple kinds of segmentation models. We experiment with different kinds of architectures, losses and training strategies. 
+The aim of this project is to build a computer vision model for segmenting substations in Sentinel 2 satellite imagery. This directory contains code to train and evaluate multiple kinds of segmentation models. We experiment with different kinds of architectures, losses and training strategies. The associated paper is [here](https://arxiv.org/abs/2409.17363)
 
 ## The directory structure:
 - dataset
