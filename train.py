@@ -95,7 +95,7 @@ val_dataloader = data.DataLoader(val_dataset, batch_size=args.batch_size, shuffl
 #MODEL
 model = setup_model(args)
 
-optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=1e-6)
 scheduler = ReduceLROnPlateau(optimizer = optimizer, mode = 'min', factor = 0.2, patience = 5, threshold=0.01, threshold_mode='rel', cooldown=5, min_lr=1e-7, eps=1e-08)
 iou_metric = BinaryJaccardIndex(0.5) 
 
