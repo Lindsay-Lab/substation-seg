@@ -1,5 +1,15 @@
 # Substation segmentation
-The aim of this project is to build a computer vision model for segmenting substations in Sentinel 2 satellite imagery. This directory contains code to train and evaluate multiple kinds of segmentation models. We experiment with different kinds of architectures, losses and training strategies. The associated paper is [here](https://arxiv.org/abs/2409.17363) and the dataset is [here](https://huggingface.co/datasets/neurograce/SubstationDataset) 
+The aim of this project is to build a computer vision model that leverages multiple revisits in Sentinel 2 satellite imagery for different segmentation tasks. This directory contains code to train and evaluate various segmentation models on two datasets - power-substation and building density dataset. By comparing multiple temporal fusion approaches across several common architectures, we find that combining information from multiple revisits in the latent space significantly increases performance on these segmentation task. The associated paper can be found [here](https://arxiv.org/abs/2409.17363) and the dataset is uploaded [here](https://huggingface.co/datasets/neurograce/SubstationDataset) 
+
+In a bid to make our research more accessible, we are releasing the weights of SWIN and UNet models-
+| Model Name  | Multi-Temporal | Link |
+| ------------- | ------------- | ------------- |
+| SWIN  | Yes | [Link](https://huggingface.co/datasets/neurograce/SubstationDataset/resolve/main/models/swin_multi_temporal_multi_spectral.pth?download=true)  |
+| SWIN  | No | [Link](https://huggingface.co/datasets/neurograce/SubstationDataset/resolve/main/models/swin_single_image_multi_spectral.pth?download=true)  |
+| UNet  | Yes | [Link](https://huggingface.co/datasets/neurograce/SubstationDataset/resolve/main/models/unet_multi_temoral_multi_spectral.pth?download=true)  |
+| UNet  | No | [Link](https://huggingface.co/datasets/neurograce/SubstationDataset/resolve/main/models/unet_single_image_multi_spectral.pth?download=true)  |
+
+
 
 ## The directory structure:
 - dataset
